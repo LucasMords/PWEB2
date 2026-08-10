@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>TODO supply a title</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<h1>FORM</h1>
+<form th:action="${funcionario.id == null} ? @{/funcionarios/save} : @{/funcionarios/update}" th:object="${funcionario}" method="post">
+    <input type="hidden" th:field="*{id}">
+    <input type="text" th:field="*{nome}"  placeholder="Nome">
+    <input type="text" th:field="*{departamento}" placeholder="Departamento">
+    <input type="number" th:field="*{salario}" placeholder="Salário" step="0.01">
+    <input type="submit" value="Enviar">
+</form>
+
+</body>
+</html>
