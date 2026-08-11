@@ -1,11 +1,24 @@
 # PWEB2
 
-Este repositório reúne as atividades desenvolvidas durante o semestre na disciplina **Programação para Web 2**, da faculdade.
+Projeto desenvolvido para a disciplina **Programacao para Web 2**.
 
-Cada pasta representa uma aula ou atividade realizada ao longo da disciplina e contém os códigos produzidos durante as aulas.
+## Tecnologias
 
-## Organização
+- Java
+- Spring Boot
+- Thymeleaf
+- H2 Database
 
-- `Aula1/`: códigos e atividades da primeira aula.
+## Execucao
 
-Novas pastas serão adicionadas conforme as próximas atividades forem realizadas.
+No Windows, execute:
+
+```cmd
+mvnw.cmd spring-boot:run
+```
+
+Para executar os testes:
+
+```cmd
+mvnw.cmd test
+```
