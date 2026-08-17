@@ -1,7 +1,9 @@
 package br.edu.ifto.aula1.Controller;
 
 import br.edu.ifto.aula1.Model.Entity.Funcionario;
-import br.edu.ifto.aula1.Model.Jdbc.dao.FuncionarioDao;
+import br.edu.ifto.aula1.Model.Jdbc.Repository.FuncionarioRepository;
+import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,14 +12,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
+@Transactional
 @Controller
 @RequestMapping("funcionarios")
 public class FuncionarioController {
 
-    FuncionarioDao dao;
+    @Autowired
+    FuncionarioRepository repository;
 
     public FuncionarioController(){
-        dao = new FuncionarioDao();
+        repository = new FuncionarioRepository();
     }
 
     @GetMapping("/form")
@@ -28,31 +32,31 @@ public class FuncionarioController {
 
     @GetMapping("/list")
     public ModelAndView listar(ModelMap model) {
-        model.addAttribute("funcionarios", dao.listarfuncionarios());
+        model.addAttribute("funcionarios", repository.listarfuncionarios());
         return new ModelAndView("funcionario/list", model);
     }
 
     @PostMapping("/save")
     public ModelAndView save(Funcionario funcionario){
-        dao.save(funcionario);
+        repository.save(funcionario);
         return new ModelAndView("redirect:/funcionarios/list");
     }
 
     @GetMapping("/remove/{id}")
     public ModelAndView remove(@PathVariable("id") Long id){
-        dao.remove(id);
+        repository.remove(id);
         return new ModelAndView("redirect:/funcionarios/list");
     }
 
     @GetMapping("/edit/{id}")
     public ModelAndView edit(@PathVariable("id") Long id, ModelMap model) {
-        model.addAttribute("funcionario", dao.buscarFuncionario(id));
+        model.addAttribute("funcionario", repository.buscarFuncionario(id));
         return new ModelAndView("funcionario/form", model);
     }
 
     @PostMapping("/update")
     public ModelAndView update(Funcionario funcionario) {
-        dao.update(funcionario);
+        repository.update(funcionario);
         return new ModelAndView("redirect:/funcionarios/list");
     }
 

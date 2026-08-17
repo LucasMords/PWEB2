@@ -1,12 +1,22 @@
 package br.edu.ifto.aula1.Model.Entity;
 
+import jakarta.persistence.*;
+
+import java.io.Serializable;
 import java.math.BigDecimal;
 
-public class Funcionario {
+@Entity
+@Table(name = "tb_pessoa")
+public class Funcionario implements Serializable {
 
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
     private Long id;
+
     private String nome;
+
     private String departamento;
+
     private BigDecimal salario;
 
     public Funcionario(){}
@@ -16,6 +26,7 @@ public class Funcionario {
         this.departamento = departamento;
         this.salario = salario;
     }
+
 
     public Long getId() {
         return id;
