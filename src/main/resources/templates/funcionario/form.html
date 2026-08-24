@@ -11,7 +11,12 @@
 <form th:action="${funcionario.id == null} ? @{/funcionarios/save} : @{/funcionarios/update}" th:object="${funcionario}" method="post">
     <input type="hidden" th:field="*{id}">
     <input type="text" th:field="*{nome}"  placeholder="Nome">
-    <input type="text" th:field="*{departamento}" placeholder="Departamento">
+    <select th:field="*{departamento.id}" required>
+        <option value="">Selecione um departamento</option>
+        <option th:each="departamento : ${departamentos}"
+                th:value="${departamento.id}"
+                th:text="${departamento.nome}"></option>
+    </select>
     <input type="number" th:field="*{salario}" placeholder="Salário" step="0.01">
     <input type="submit" value="Enviar">
 </form>

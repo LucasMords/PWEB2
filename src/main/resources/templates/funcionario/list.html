@@ -18,7 +18,7 @@
     <tr th:each="funcionario : ${funcionarios}">
         <td th:text="${funcionario.id}"> </td>
         <td th:text="${funcionario.nome}"> </td>
-        <td th:text="${funcionario.departamento}"> </td>
+        <td th:text="${funcionario.departamento.nome}"> </td>
         <td th:text="${funcionario.salario}"> </td>
         <td> <a th:href="@{/funcionarios/edit/{id}(id=${funcionario.id})}">Editar</a> </td>
         <td> <a onclick="return window.confirm('Tem certeza que deseja excluir este registro?')"  th:href="@{/funcionarios/remove/{id}(id=${funcionario.id})}">Excluir</a> </td>

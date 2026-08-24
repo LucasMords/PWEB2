@@ -6,7 +6,7 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "tb_pessoa")
+@Table(name = "tb_funcionario")
 public class Funcionario implements Serializable {
 
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -15,12 +15,14 @@ public class Funcionario implements Serializable {
 
     private String nome;
 
-    private String departamento;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "departamento_id", nullable = false)
+    private Departamento departamento;
 
     private BigDecimal salario;
 
     public Funcionario(){}
-    public Funcionario(Long id, String nome, String departamento, BigDecimal salario){
+    public Funcionario(Long id, String nome, Departamento departamento, BigDecimal salario){
         this.id = id;
         this.nome = nome;
         this.departamento = departamento;
@@ -44,11 +46,11 @@ public class Funcionario implements Serializable {
         this.nome = nome;
     }
 
-    public String getDepartamento() {
+    public Departamento getDepartamento() {
         return departamento;
     }
 
-    public void setDepartamento(String departamento) {
+    public void setDepartamento(Departamento departamento) {
         this.departamento = departamento;
     }
 
@@ -60,4 +62,3 @@ public class Funcionario implements Serializable {
         this.salario = salario;
     }
 }
-

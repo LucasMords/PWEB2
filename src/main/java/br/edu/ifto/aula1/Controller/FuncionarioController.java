@@ -1,6 +1,8 @@
 package br.edu.ifto.aula1.Controller;
 
+import br.edu.ifto.aula1.Model.Entity.Departamento;
 import br.edu.ifto.aula1.Model.Entity.Funcionario;
+import br.edu.ifto.aula1.Model.Jdbc.Repository.DepartamentoRepository;
 import br.edu.ifto.aula1.Model.Jdbc.Repository.FuncionarioRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,13 +22,15 @@ public class FuncionarioController {
     @Autowired
     FuncionarioRepository repository;
 
-    public FuncionarioController(){
-        repository = new FuncionarioRepository();
-    }
+    @Autowired
+    DepartamentoRepository departamentoRepository;
 
     @GetMapping("/form")
     public ModelAndView form(ModelMap model){
-        model.addAttribute("funcionario", new Funcionario());
+        Funcionario funcionario = new Funcionario();
+        funcionario.setDepartamento(new Departamento());
+        model.addAttribute("funcionario", funcionario);
+        adicionarDepartamentos(model);
         return new ModelAndView("funcionario/form", model);
     }
 
@@ -38,6 +42,7 @@ public class FuncionarioController {
 
     @PostMapping("/save")
     public ModelAndView save(Funcionario funcionario){
+        associarDepartamentoGerenciado(funcionario);
         repository.save(funcionario);
         return new ModelAndView("redirect:/funcionarios/list");
     }
@@ -51,14 +56,32 @@ public class FuncionarioController {
     @GetMapping("/edit/{id}")
     public ModelAndView edit(@PathVariable("id") Long id, ModelMap model) {
         model.addAttribute("funcionario", repository.buscarFuncionario(id));
+        adicionarDepartamentos(model);
         return new ModelAndView("funcionario/form", model);
     }
 
     @PostMapping("/update")
     public ModelAndView update(Funcionario funcionario) {
+        associarDepartamentoGerenciado(funcionario);
         repository.update(funcionario);
         return new ModelAndView("redirect:/funcionarios/list");
     }
 
-}
+    private void adicionarDepartamentos(ModelMap model) {
+        model.addAttribute("departamentos", departamentoRepository.listar());
+    }
 
+    private void associarDepartamentoGerenciado(Funcionario funcionario) {
+        Departamento departamento = funcionario.getDepartamento();
+        if (departamento == null || departamento.getId() == null) {
+            throw new IllegalArgumentException("Um departamento deve ser selecionado.");
+        }
+
+        Departamento departamentoGerenciado = departamentoRepository.buscarPorId(departamento.getId());
+        if (departamentoGerenciado == null) {
+            throw new IllegalArgumentException("Departamento inválido.");
+        }
+        funcionario.setDepartamento(departamentoGerenciado);
+    }
+
+}
