@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta</title>
+    <link rel="stylesheet" th:href="@{/css/estilo.css}">
+</head>
+<body>
+
+<header>
+    <strong>Clínica IFTO</strong>
+    <nav>
+        <a th:href="@{/consultas/list}">Voltar</a>
+    </nav>
+</header>
+
+<main>
+    <h1 th:text="${consulta.id == null ? 'Nova consulta' : 'Editar consulta'}"></h1>
+
+    <form class="cartao"
+          th:action="${consulta.id == null} ? @{/consultas/save} : @{/consultas/update}"
+          th:object="${consulta}"
+          method="post">
+        <input type="hidden" th:field="*{id}">
+
+        <label>Paciente</label>
+        <select th:field="*{paciente.id}" required>
+            <option value="">Selecione</option>
+            <option th:each="paciente : ${pacientes}"
+                    th:value="${paciente.id}"
+                    th:text="${paciente.nome}">
+            </option>
+        </select>
+
+        <label>Médico</label>
+        <select th:field="*{medico.id}" required>
+            <option value="">Selecione</option>
+            <option th:each="medico : ${medicos}"
+                    th:value="${medico.id}"
+                    th:text="${medico.nome + ' - ' + medico.especialidade}">
+            </option>
+        </select>
+
+        <label>Data e hora</label>
+        <input type="datetime-local" th:field="*{dataHora}" required>
+
+        <label>Status</label>
+        <select th:field="*{status}" required>
+            <option th:each="situacao : ${statusDisponiveis}"
+                    th:value="${situacao}"
+                    th:text="${situacao.descricao}">
+            </option>
+        </select>
+
+        <label>Observações</label>
+        <textarea th:field="*{observacoes}" maxlength="500"></textarea>
+
+        <button type="submit">Salvar</button>
+    </form>
+</main>
+
+</body>
+</html>

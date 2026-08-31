@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clínica</title>
+    <link rel="stylesheet" th:href="@{/css/estilo.css}">
+</head>
+<body>
+
+<header>
+    <strong>Clínica IFTO</strong>
+    <nav>
+        <a th:href="@{/pacientes/list}">Pacientes</a>
+        <a th:href="@{/medicos/list}">Médicos</a>
+        <a th:href="@{/consultas/list}">Consultas</a>
+    </nav>
+</header>
+
+<main>
+    <h1>Sistema de consultas</h1>
+    <p>Cadastre pacientes e médicos e gerencie a agenda de consultas.</p>
+
+    <div class="acoes">
+        <a class="botao" th:href="@{/consultas/form}">Agendar consulta</a>
+        <a class="botao secundario" th:href="@{/pacientes/form}">Novo paciente</a>
+        <a class="botao secundario" th:href="@{/medicos/form}">Novo médico</a>
+    </div>
+</main>
+
+</body>
+</html>

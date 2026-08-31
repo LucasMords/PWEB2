@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Médicos</title>
+    <link rel="stylesheet" th:href="@{/css/estilo.css}">
+</head>
+<body>
+
+<header>
+    <strong>Clínica IFTO</strong>
+    <nav>
+        <a th:href="@{/}">Início</a>
+        <a th:href="@{/pacientes/list}">Pacientes</a>
+        <a th:href="@{/consultas/list}">Consultas</a>
+    </nav>
+</header>
+
+<main>
+    <div class="topo">
+        <h1>Médicos</h1>
+        <a class="botao" th:href="@{/medicos/form}">Novo médico</a>
+    </div>
+
+    <div class="tabela">
+        <table>
+            <thead>
+            <tr>
+                <th>Nome</th>
+                <th>CRM</th>
+                <th>Especialidade</th>
+                <th>Telefone</th>
+                <th>Ações</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="medico : ${medicos}">
+                <td th:text="${medico.nome}"></td>
+                <td th:text="${medico.crm}"></td>
+                <td th:text="${medico.especialidade}"></td>
+                <td th:text="${medico.telefone}"></td>
+                <td>
+                    <div class="acoes">
+                        <a class="botao" th:href="@{/medicos/consultas/{id}(id=${medico.id})}">Consultas</a>
+                        <a class="botao secundario" th:href="@{/medicos/edit/{id}(id=${medico.id})}">Editar</a>
+                        <a class="botao perigo"
+                           th:href="@{/medicos/remove/{id}(id=${medico.id})}"
+                           onclick="return confirm('Excluir este médico e suas consultas?')">Excluir</a>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+
+</body>
+</html>

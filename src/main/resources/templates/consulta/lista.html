@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultas</title>
+    <link rel="stylesheet" th:href="@{/css/estilo.css}">
+</head>
+<body>
+
+<header>
+    <strong>Clínica IFTO</strong>
+    <nav>
+        <a th:href="@{/}">Início</a>
+        <a th:href="@{/pacientes/list}">Pacientes</a>
+        <a th:href="@{/medicos/list}">Médicos</a>
+    </nav>
+</header>
+
+<main>
+    <div class="topo">
+        <h1 th:text="${titulo}">Consultas</h1>
+        <a class="botao" th:href="@{/consultas/form}">Nova consulta</a>
+    </div>
+
+    <p class="vazio" th:if="${#lists.isEmpty(consultas)}">
+        Nenhuma consulta encontrada.
+    </p>
+
+    <div class="tabela" th:unless="${#lists.isEmpty(consultas)}">
+        <table>
+            <thead>
+            <tr>
+                <th>Data e hora</th>
+                <th>Paciente</th>
+                <th>Médico</th>
+                <th>Status</th>
+                <th>Observações</th>
+                <th>Ações</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="consulta : ${consultas}">
+                <td th:text="${#temporals.format(consulta.dataHora, 'dd/MM/yyyy HH:mm')}"></td>
+                <td th:text="${consulta.paciente.nome}"></td>
+                <td th:text="${consulta.medico.nome}"></td>
+                <td th:text="${consulta.status.descricao}"></td>
+                <td th:text="${consulta.observacoes}"></td>
+                <td>
+                    <div class="acoes">
+                        <a class="botao secundario"
+                           th:href="@{/consultas/edit/{id}(id=${consulta.id})}">Editar</a>
+
+                        <a class="botao perigo"
+                           th:href="@{/consultas/remove/{id}(id=${consulta.id})}"
+                           onclick="return confirm('Excluir esta consulta?')">Excluir</a>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,145 @@
+:root {
+    font-family: Arial, sans-serif;
+    color: #18302b;
+    background-color: #f3f7f6;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1rem 5%;
+    color: white;
+    background-color: #126b5b;
+}
+
+header strong {
+    font-size: 1.25rem;
+}
+
+nav {
+    display: flex;
+    gap: 1rem;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+}
+
+main {
+    max-width: 1100px;
+    margin: 2rem auto;
+    padding: 0 1.25rem;
+}
+
+.topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.acoes {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.botao,
+button {
+    padding: 0.6rem 0.85rem;
+    border: 0;
+    border-radius: 0.4rem;
+    color: white;
+    background-color: #126b5b;
+    font-size: 0.9rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.secundario {
+    background-color: #607772;
+}
+
+.perigo {
+    background-color: #ad3f3f;
+}
+
+.tabela {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+}
+
+th,
+td {
+    padding: 0.8rem;
+    border-bottom: 1px solid #dce8e5;
+    text-align: left;
+}
+
+th {
+    background-color: #e2efec;
+}
+
+.cartao {
+    max-width: 700px;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    background-color: white;
+}
+
+label {
+    display: block;
+    margin-top: 0.9rem;
+    margin-bottom: 0.3rem;
+    font-weight: bold;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    padding: 0.65rem;
+    border: 1px solid #aebfbb;
+    border-radius: 0.35rem;
+    font: inherit;
+}
+
+textarea {
+    min-height: 100px;
+    margin-bottom: 1rem;
+    resize: vertical;
+}
+
+.cartao button {
+    margin-top: 1rem;
+}
+
+.vazio {
+    padding: 1.5rem;
+    border-radius: 0.4rem;
+    background-color: white;
+}
+
+@media (max-width: 700px) {
+    header,
+    .topo {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
