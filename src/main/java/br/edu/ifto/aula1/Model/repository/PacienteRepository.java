@@ -4,4 +4,5 @@ import br.edu.ifto.aula1.Model.Entity.Paciente;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PacienteRepository extends JpaRepository<Paciente, Long> {
+    java.util.Optional<Paciente> findByCpf(String cpf);
 }

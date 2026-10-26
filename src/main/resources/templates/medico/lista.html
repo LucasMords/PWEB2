@@ -18,6 +18,7 @@
 </header>
 
 <main>
+    <p class="sucesso" role="status" th:if="${mensagem != null}" th:text="${mensagem}"></p>
     <div class="topo">
         <h1>Médicos</h1>
         <a class="botao" th:href="@{/medicos/form}">Novo médico</a>
@@ -44,9 +45,7 @@
                     <div class="acoes">
                         <a class="botao" th:href="@{/medicos/consultas/{id}(id=${medico.id})}">Consultas</a>
                         <a class="botao secundario" th:href="@{/medicos/edit/{id}(id=${medico.id})}">Editar</a>
-                        <a class="botao perigo"
-                           th:href="@{/medicos/remove/{id}(id=${medico.id})}"
-                           onclick="return confirm('Excluir este médico e suas consultas?')">Excluir</a>
+                        <form method="post" th:action="@{/medicos/remove/{id}(id=${medico.id})}" onsubmit="return confirm('Confirma a exclusao?')"><button class="botao perigo" type="submit">Excluir</button></form>
                     </div>
                 </td>
             </tr>

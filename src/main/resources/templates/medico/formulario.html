@@ -22,22 +22,33 @@
           th:action="${medico.id == null} ? @{/medicos/save} : @{/medicos/update}"
           th:object="${medico}"
           method="post">
-        <input type="hidden" th:field="*{id}">
+        <div class="erros" role="alert" th:if="${#fields.hasAnyErrors()}">
+            <p>Corrija os dados abaixo:</p>
+            <ul><li th:each="erro : ${#fields.detailedErrors()}" th:text="${erro.message}"></li></ul>
+        </div>
+        <input type="hidden" th:field="*{id}" th:errorclass="is-invalid">
+
+        <small class="erro" th:if="${#fields.hasErrors('id')}" th:errors="*{id}"></small>
 
         <label>Nome</label>
-        <input type="text" th:field="*{nome}" maxlength="120" required>
+        <input type="text" th:field="*{nome}" th:errorclass="is-invalid" maxlength="120" required>
+        <small class="erro" th:if="${#fields.hasErrors('nome')}" th:errors="*{nome}"></small>
 
         <label>CRM</label>
-        <input type="text" th:field="*{crm}" maxlength="20" required>
+        <input type="text" th:field="*{crm}" th:errorclass="is-invalid" maxlength="20" required>
+        <small class="erro" th:if="${#fields.hasErrors('crm')}" th:errors="*{crm}"></small>
 
         <label>Especialidade</label>
-        <input type="text" th:field="*{especialidade}" maxlength="80" required>
+        <input type="text" th:field="*{especialidade}" th:errorclass="is-invalid" maxlength="80" required>
+        <small class="erro" th:if="${#fields.hasErrors('especialidade')}" th:errors="*{especialidade}"></small>
 
         <label>Telefone</label>
-        <input type="text" th:field="*{telefone}" maxlength="20">
+        <input type="text" th:field="*{telefone}" th:errorclass="is-invalid" maxlength="20">
+        <small class="erro" th:if="${#fields.hasErrors('telefone')}" th:errors="*{telefone}"></small>
 
         <label>E-mail</label>
-        <input type="email" th:field="*{email}" maxlength="120">
+        <input type="email" th:field="*{email}" th:errorclass="is-invalid" maxlength="120">
+        <small class="erro" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></small>
 
         <button type="submit">Salvar</button>
     </form>

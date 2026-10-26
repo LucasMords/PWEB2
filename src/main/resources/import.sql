@@ -1,6 +1,6 @@
-INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email) VALUES ('Ana Souza', '111.111.111-11', '1992-05-14', '(63) 99999-1001', 'ana@email.com');
-INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email) VALUES ('Carlos Lima', '222.222.222-22', '1985-09-22', '(63) 99999-1002', 'carlos@email.com');
-INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email) VALUES ('Mariana Alves', '333.333.333-33', '2000-01-10', '(63) 99999-1003', 'mariana@email.com');
+INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email) VALUES ('Ana Souza', '52998224725', '1992-05-14', '(63) 99999-1001', 'ana@email.com');
+INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email) VALUES ('Carlos Lima', '11144477735', '1985-09-22', '(63) 99999-1002', 'carlos@email.com');
+INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email) VALUES ('Mariana Alves', '12345678909', '2000-01-10', '(63) 99999-1003', 'mariana@email.com');
 
 INSERT INTO medicos (nome, crm, especialidade, telefone, email) VALUES ('Dra. Beatriz Rocha', 'CRM-TO 1001', 'Cardiologia', '(63) 99999-2001', 'beatriz@clinica.com');
 INSERT INTO medicos (nome, crm, especialidade, telefone, email) VALUES ('Dr. Eduardo Melo', 'CRM-TO 1002', 'Clinica Geral', '(63) 99999-2002', 'eduardo@clinica.com');

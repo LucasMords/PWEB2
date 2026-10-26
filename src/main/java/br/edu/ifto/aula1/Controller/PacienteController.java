@@ -3,8 +3,21 @@ package br.edu.ifto.aula1.Controller;
 import br.edu.ifto.aula1.Model.Entity.Paciente;
 import br.edu.ifto.aula1.Model.repository.ConsultaRepository;
 import br.edu.ifto.aula1.Model.repository.PacienteRepository;
-import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import br.edu.ifto.aula1.Validation.Cadastro;
+import br.edu.ifto.aula1.Validation.Edicao;
+import jakarta.validation.groups.Default;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import java.util.Objects;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,12 +30,21 @@ import org.springframework.web.servlet.ModelAndView;
 @Controller
 @RequestMapping("pacientes")
 public class PacienteController {
+    private final EntityManager em;
+    private final PacienteRepository repository;
+    private final ConsultaRepository consultaRepository;
 
-    @Autowired
-    PacienteRepository repository;
+    public PacienteController(PacienteRepository repository,
+                              ConsultaRepository consultaRepository, EntityManager em) {
+        this.em = em;
+        this.repository = repository;
+        this.consultaRepository = consultaRepository;
+    }
 
-    @Autowired
-    ConsultaRepository consultaRepository;
+    @InitBinder("paciente")
+    void campos(WebDataBinder binder) {
+        binder.setAllowedFields("id", "nome", "cpf", "dataNascimento", "telefone", "email");
+    }
 
     @GetMapping("/form")
     public ModelAndView form(ModelMap model) {
@@ -37,8 +59,12 @@ public class PacienteController {
     }
 
     @PostMapping("/save")
-    public ModelAndView save(Paciente paciente) {
-        repository.save(paciente);
+    public ModelAndView save(@Validated({Default.class, Cadastro.class}) @ModelAttribute("paciente") Paciente paciente,
+                             BindingResult errors, RedirectAttributes attributes) {
+        if (errors.hasErrors()) return new ModelAndView("paciente/formulario");
+        salvarPaciente(paciente, false, errors);
+        if (errors.hasErrors()) return new ModelAndView("paciente/formulario");
+        attributes.addFlashAttribute("mensagem", "Paciente cadastrado com sucesso.");
         return new ModelAndView("redirect:/pacientes/list");
     }
 
@@ -49,22 +75,19 @@ public class PacienteController {
     }
 
     @PostMapping("/update")
-    public ModelAndView update(Paciente paciente) {
-        Paciente pacienteBanco = buscarPaciente(paciente.getId());
-
-        pacienteBanco.setNome(paciente.getNome());
-        pacienteBanco.setCpf(paciente.getCpf());
-        pacienteBanco.setDataNascimento(paciente.getDataNascimento());
-        pacienteBanco.setTelefone(paciente.getTelefone());
-        pacienteBanco.setEmail(paciente.getEmail());
-
-        repository.save(pacienteBanco);
+    public ModelAndView update(@Validated({Default.class, Edicao.class}) @ModelAttribute("paciente") Paciente paciente,
+                               BindingResult errors, RedirectAttributes attributes) {
+        if (errors.hasErrors()) return new ModelAndView("paciente/formulario");
+        salvarPaciente(paciente, true, errors);
+        if (errors.hasErrors()) return new ModelAndView("paciente/formulario");
+        attributes.addFlashAttribute("mensagem", "Paciente atualizado com sucesso.");
         return new ModelAndView("redirect:/pacientes/list");
     }
 
-    @GetMapping("/remove/{id}")
-    public ModelAndView remove(@PathVariable("id") Long id) {
-        repository.deleteById(id);
+    @PostMapping("/remove/{id}")
+    public ModelAndView remove(@PathVariable("id") Long id, RedirectAttributes attributes) {
+        excluirPaciente(id);
+        attributes.addFlashAttribute("mensagem", "Paciente excluído com sucesso.");
         return new ModelAndView("redirect:/pacientes/list");
     }
 
@@ -79,6 +102,51 @@ public class PacienteController {
     }
 
     private Paciente buscarPaciente(Long id) {
-        return repository.findById(id).orElseThrow();
+        validarId(id);
+        return repository.findById(id).orElseThrow(() -> ausente("Paciente"));
+    }
+
+    private void validarId(Long id) {
+        if (id == null || id <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identificador invalido.");
+    }
+
+    private ResponseStatusException ausente(String tipo) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, tipo + " nao encontrado.");
+    }
+
+    private void salvarPaciente(Paciente entrada, boolean edicao, BindingResult errors) {
+        if (errors.hasErrors()) return;
+        validar(entrada, edicao, errors);
+        if (errors.hasErrors()) return;
+        Paciente destino = edicao ? buscarPaciente(entrada.getId()) : new Paciente();
+        destino.setNome(entrada.getNome());
+        destino.setCpf(entrada.getCpf());
+        destino.setDataNascimento(entrada.getDataNascimento());
+        destino.setTelefone(entrada.getTelefone());
+        destino.setEmail(entrada.getEmail());
+        repository.save(destino);
+    }
+
+    private void excluirPaciente(Long id) {
+        validarId(id);
+        Paciente paciente = em.find(Paciente.class, id, LockModeType.PESSIMISTIC_WRITE);
+        if (paciente == null) throw ausente("Paciente");
+        if (consultaRepository.existsByPacienteId(id)) throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Paciente possui consultas vinculadas e nao pode ser excluido.");
+        repository.delete(paciente);
+    }
+
+    private void validar(Paciente paciente, boolean edicao, BindingResult errors) {
+        if (edicao) {
+            Paciente existente = buscarPaciente(paciente.getId());
+            em.lock(existente, LockModeType.PESSIMISTIC_WRITE);
+            if (!errors.hasFieldErrors("dataNascimento") && paciente.getDataNascimento() != null &&
+                    consultaRepository.existsByPacienteIdAndDataHoraBefore(paciente.getId(), paciente.getDataNascimento().atStartOfDay()))
+                errors.rejectValue("dataNascimento", "historico", "Nascimento nao pode ser posterior as consultas do paciente.");
+        }
+        else if (paciente.getId() != null) errors.reject("id", "Cadastro novo nao deve informar identificador.");
+        if (!errors.hasFieldErrors("cpf") && repository.findByCpf(paciente.getCpf())
+                .filter(p -> !Objects.equals(p.getId(), paciente.getId())).isPresent())
+            errors.rejectValue("cpf", "duplicado", "CPF ja cadastrado.");
     }
 }

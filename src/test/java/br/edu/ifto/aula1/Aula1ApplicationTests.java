@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@org.springframework.transaction.annotation.Transactional
 class Aula1ApplicationTests {
     @Autowired
     private PacienteRepository pacientes;
@@ -38,7 +39,7 @@ class Aula1ApplicationTests {
         Paciente paciente = pacientes.findAll().getFirst();
         Medico medico = medicos.findAll().getFirst();
         Consulta consulta = new Consulta();
-        consulta.setDataHora(LocalDateTime.of(2026, 10, 1, 8, 30));
+        consulta.setDataHora(LocalDateTime.now().plusDays(5));
         consulta.setStatus(StatusConsulta.AGENDADA);
         consulta.setPaciente(paciente);
         consulta.setMedico(medico);

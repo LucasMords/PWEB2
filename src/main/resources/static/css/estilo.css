@@ -136,6 +136,34 @@ textarea {
     background-color: white;
 }
 
+.erro,
+.erros {
+    color: #9f2020;
+}
+
+.is-invalid {
+    border: 2px solid #9f2020;
+}
+
+.sucesso {
+    padding: 1rem;
+    color: #14532d;
+    background: #f0fdf4;
+    border: 1px solid #14532d;
+    border-radius: 0.4rem;
+}
+
+.erros {
+    padding: 1rem;
+    border: 1px solid #9f2020;
+    border-radius: 0.4rem;
+    background: #fff4f4;
+}
+
+.acoes form {
+    margin: 0;
+}
+
 @media (max-width: 700px) {
     header,
     .topo {
