@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<!-- O Spring Boot usa este template automaticamente para respostas 404
+     (ex.: ResponseStatusException(NOT_FOUND) lançada nos controllers). -->
+<head th:replace="~{fragments/layout :: head('Não encontrado')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <h1 class="display-6">Registro não encontrado</h1>
+            <p class="text-secondary mb-4">O endereço acessado não existe ou o registro foi excluído.</p>
+            <a class="btn btn-primary" th:href="@{/}">Voltar ao início</a>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

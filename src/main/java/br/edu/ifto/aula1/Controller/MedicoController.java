@@ -1,11 +1,9 @@
 package br.edu.ifto.aula1.Controller;
 
 import br.edu.ifto.aula1.Model.Entity.Medico;
-import br.edu.ifto.aula1.Model.repository.ConsultaRepository;
-import br.edu.ifto.aula1.Model.repository.MedicoRepository;
-import jakarta.transaction.Transactional;
+import br.edu.ifto.aula1.Service.ConsultaService;
+import br.edu.ifto.aula1.Service.MedicoService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.validation.BindingResult;
@@ -16,16 +14,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-@Transactional
 @Controller
 @RequestMapping("medicos")
 public class MedicoController {
 
-    @Autowired
-    MedicoRepository repository;
+    private final MedicoService service;
+    private final ConsultaService consultaService;
 
-    @Autowired
-    ConsultaRepository consultaRepository;
+    public MedicoController(MedicoService service, ConsultaService consultaService) {
+        this.service = service;
+        this.consultaService = consultaService;
+    }
 
     @GetMapping("/form")
     public ModelAndView form(ModelMap model) {
@@ -35,24 +34,25 @@ public class MedicoController {
 
     @GetMapping("/list")
     public ModelAndView listar(ModelMap model) {
-        model.addAttribute("medicos", repository.findAll());
+        model.addAttribute("medicos", service.listar());
         return new ModelAndView("medico/lista", model);
     }
 
     @PostMapping("/save")
     public ModelAndView save(@Valid Medico medico, BindingResult result, RedirectAttributes attributes) {
+        medico.setId(null); // cadastro nunca usa id vindo da requisição (nem na checagem de CRM duplicado)
         validarCrmUnico(medico, result);
         if (result.hasErrors())
             return new ModelAndView("medico/formulario");
 
-        repository.save(medico);
+        service.cadastrar(medico);
         attributes.addFlashAttribute("mensagem", "Médico cadastrado com sucesso.");
         return new ModelAndView("redirect:/medicos/list");
     }
 
     @GetMapping("/edit/{id}")
     public ModelAndView edit(@PathVariable("id") Long id, ModelMap model) {
-        model.addAttribute("medico", buscarMedico(id));
+        model.addAttribute("medico", service.buscar(id));
         return new ModelAndView("medico/formulario", model);
     }
 
@@ -62,31 +62,23 @@ public class MedicoController {
         if (result.hasErrors())
             return new ModelAndView("medico/formulario");
 
-        Medico medicoBanco = buscarMedico(medico.getId());
-
-        medicoBanco.setNome(medico.getNome());
-        medicoBanco.setCrm(medico.getCrm());
-        medicoBanco.setEspecialidade(medico.getEspecialidade());
-        medicoBanco.setTelefone(medico.getTelefone());
-        medicoBanco.setEmail(medico.getEmail());
-
-        repository.save(medicoBanco);
+        service.atualizar(medico);
         attributes.addFlashAttribute("mensagem", "Médico atualizado com sucesso.");
         return new ModelAndView("redirect:/medicos/list");
     }
 
     @GetMapping("/remove/{id}")
     public ModelAndView remove(@PathVariable("id") Long id) {
-        repository.deleteById(id);
+        service.remover(id);
         return new ModelAndView("redirect:/medicos/list");
     }
 
     @GetMapping("/consultas/{id}")
     public ModelAndView consultas(@PathVariable("id") Long id, ModelMap model) {
-        Medico medico = buscarMedico(id);
+        Medico medico = service.buscar(id);
 
         model.addAttribute("titulo", "Consultas do médico " + medico.getNome());
-        model.addAttribute("consultas", consultaRepository.findByMedicoIdOrderByDataHoraDesc(id));
+        model.addAttribute("consultas", consultaService.listarPorMedico(id));
 
         return new ModelAndView("consulta/lista", model);
     }
@@ -97,15 +89,7 @@ public class MedicoController {
         if (result.hasFieldErrors("crm"))
             return;
 
-        boolean duplicado = medico.getId() == null
-                ? repository.existsByCrm(medico.getCrm())
-                : repository.existsByCrmAndIdNot(medico.getCrm(), medico.getId());
-
-        if (duplicado)
+        if (service.crmEmUso(medico.getCrm(), medico.getId()))
             result.rejectValue("crm", "Duplicado", "Já existe um médico com este CRM.");
-    }
-
-    private Medico buscarMedico(Long id) {
-        return repository.findById(id).orElseThrow();
     }
 }

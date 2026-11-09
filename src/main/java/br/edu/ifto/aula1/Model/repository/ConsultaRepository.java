@@ -8,9 +8,11 @@ import java.util.List;
 
 public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
 
-    @Override
+    // paciente e medico são LAZY e o open-in-view está desligado: o @EntityGraph os carrega
+    // na mesma consulta para que a listagem consiga exibir os nomes.
+
     @EntityGraph(attributePaths = {"paciente", "medico"})
-    List<Consulta> findAll();
+    List<Consulta> findAllByOrderByDataHoraDesc();
 
     @EntityGraph(attributePaths = {"paciente", "medico"})
     List<Consulta> findByPacienteIdOrderByDataHoraDesc(Long pacienteId);

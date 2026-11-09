@@ -2,11 +2,10 @@ package br.edu.ifto.aula1.Controller;
 
 import br.edu.ifto.aula1.Model.Entity.Consulta;
 import br.edu.ifto.aula1.Model.Entity.StatusConsulta;
-import br.edu.ifto.aula1.Model.repository.ConsultaRepository;
-import br.edu.ifto.aula1.Model.repository.MedicoRepository;
-import br.edu.ifto.aula1.Model.repository.PacienteRepository;
+import br.edu.ifto.aula1.Service.ConsultaService;
+import br.edu.ifto.aula1.Service.MedicoService;
+import br.edu.ifto.aula1.Service.PacienteService;
 import br.edu.ifto.aula1.Validation.Cadastro;
-import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.stereotype.Controller;
@@ -20,19 +19,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-@Transactional
 @Controller
 @RequestMapping("consultas")
 public class ConsultaController {
 
-    ConsultaRepository repository;
-    PacienteRepository pacienteRepository;
-    MedicoRepository medicoRepository;
+    private final ConsultaService service;
+    private final PacienteService pacienteService;
+    private final MedicoService medicoService;
 
-    public ConsultaController(ConsultaRepository repository, PacienteRepository pacienteRepository, MedicoRepository medicoRepository) {
-        this.repository = repository;
-        this.pacienteRepository = pacienteRepository;
-        this.medicoRepository = medicoRepository;
+    public ConsultaController(ConsultaService service, PacienteService pacienteService, MedicoService medicoService) {
+        this.service = service;
+        this.pacienteService = pacienteService;
+        this.medicoService = medicoService;
     }
 
     @GetMapping("/form")
@@ -44,7 +42,7 @@ public class ConsultaController {
     @GetMapping("/list")
     public ModelAndView listar(ModelMap model) {
         model.addAttribute("titulo", "Todas as consultas");
-        model.addAttribute("consultas", repository.findAll());
+        model.addAttribute("consultas", service.listar());
         return new ModelAndView("consulta/lista", model);
     }
 
@@ -54,26 +52,21 @@ public class ConsultaController {
                              ModelMap model,
                              RedirectAttributes attributes) {
 
-        // O status não é escolhido no cadastro: toda consulta nova começa agendada,
-        // mesmo que alguém envie outro valor na requisição.
-        consulta.setId(null);
-        consulta.setStatus(StatusConsulta.AGENDADA);
-
         validarPacienteEMedico(consulta, result);
         if (result.hasErrors()) {
             adicionarDadosFormulario(model, consulta);
             return new ModelAndView("consulta/formulario");
         }
 
-        associarPacienteEMedico(consulta);
-        repository.save(consulta);
+        // O serviço força o status AGENDADA: ele não é escolhido no cadastro.
+        service.agendar(consulta);
         attributes.addFlashAttribute("mensagem", "Consulta agendada com sucesso.");
         return new ModelAndView("redirect:/consultas/list");
     }
 
     @GetMapping("/edit/{id}")
     public ModelAndView edit(@PathVariable("id") Long id, ModelMap model) {
-        adicionarDadosFormulario(model, buscarConsulta(id));
+        adicionarDadosFormulario(model, service.buscar(id));
         return new ModelAndView("consulta/formulario", model);
     }
 
@@ -83,52 +76,42 @@ public class ConsultaController {
                                ModelMap model,
                                RedirectAttributes attributes) {
 
+        // Garante que a consulta editada existe (senão 404) antes de qualquer validação.
+        service.buscar(consulta.getId());
+
         validarPacienteEMedico(consulta, result);
         if (result.hasErrors()) {
             adicionarDadosFormulario(model, consulta);
             return new ModelAndView("consulta/formulario");
         }
 
-        associarPacienteEMedico(consulta);
-        repository.save(consulta);
+        service.atualizar(consulta);
         attributes.addFlashAttribute("mensagem", "Consulta atualizada com sucesso.");
         return new ModelAndView("redirect:/consultas/list");
     }
 
     @GetMapping("/remove/{id}")
     public ModelAndView remove(@PathVariable("id") Long id) {
-        repository.deleteById(id);
+        service.remover(id);
         return new ModelAndView("redirect:/consultas/list");
     }
 
     private void adicionarDadosFormulario(ModelMap model, Consulta consulta) {
         model.addAttribute("consulta", consulta);
-        model.addAttribute("pacientes", pacienteRepository.findAll());
-        model.addAttribute("medicos", medicoRepository.findAll());
+        model.addAttribute("pacientes", pacienteService.listar());
+        model.addAttribute("medicos", medicoService.listar());
         model.addAttribute("statusDisponiveis", StatusConsulta.values());
     }
 
     private void validarPacienteEMedico(Consulta consulta, BindingResult result) {
         if (consulta.getPaciente() == null || consulta.getPaciente().getId() == null)
             result.rejectValue("paciente.id", "NotNull", "Selecione o paciente.");
-        else if (!pacienteRepository.existsById(consulta.getPaciente().getId()))
+        else if (!pacienteService.existe(consulta.getPaciente().getId()))
             result.rejectValue("paciente.id", "NotFound", "Paciente não encontrado.");
 
         if (consulta.getMedico() == null || consulta.getMedico().getId() == null)
             result.rejectValue("medico.id", "NotNull", "Selecione o médico.");
-        else if (!medicoRepository.existsById(consulta.getMedico().getId()))
+        else if (!medicoService.existe(consulta.getMedico().getId()))
             result.rejectValue("medico.id", "NotFound", "Médico não encontrado.");
-    }
-
-    private void associarPacienteEMedico(Consulta consulta) {
-        Long pacienteId = consulta.getPaciente().getId();
-        Long medicoId = consulta.getMedico().getId();
-
-        consulta.setPaciente(pacienteRepository.findById(pacienteId).orElseThrow());
-        consulta.setMedico(medicoRepository.findById(medicoId).orElseThrow());
-    }
-
-    private Consulta buscarConsulta(Long id) {
-        return repository.findById(id).orElseThrow();
     }
 }
