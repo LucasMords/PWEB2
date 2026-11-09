@@ -1,58 +1,70 @@
 <!DOCTYPE html>
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Médico</title>
-    <link rel="stylesheet" th:href="@{/css/estilo.css}">
-</head>
+<head th:replace="~{fragments/layout :: head('Médico')}"></head>
 <body>
 
-<header>
-    <strong>Clínica IFTO</strong>
-    <nav>
-        <a th:href="@{/medicos/list}">Voltar</a>
-    </nav>
-</header>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
 
-<main>
-    <h1 th:text="${medico.id == null ? 'Novo médico' : 'Editar médico'}"></h1>
+<main class="container">
+    <div class="row">
+        <div class="col-lg-8">
+            <h1 class="h3 mb-3" th:text="${medico.id == null ? 'Novo médico' : 'Editar médico'}"></h1>
 
-    <form class="cartao"
-          th:action="${medico.id == null} ? @{/medicos/save} : @{/medicos/update}"
-          th:object="${medico}"
-          method="post">
-        <div class="erros" role="alert" th:if="${#fields.hasAnyErrors()}">
-            <p>Corrija os dados abaixo:</p>
-            <ul><li th:each="erro : ${#fields.detailedErrors()}" th:text="${erro.message}"></li></ul>
+            <!-- novalidate: o navegador não valida nada; quem valida é o back-end -->
+            <form class="card card-body border-0 shadow-sm"
+                  th:action="${medico.id == null} ? @{/medicos/save} : @{/medicos/update}"
+                  th:object="${medico}"
+                  method="post"
+                  novalidate>
+                <input type="hidden" th:field="*{id}">
+
+                <div th:replace="~{fragments/layout :: erros}"></div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="nome">Nome</label>
+                    <input type="text" class="form-control" th:field="*{nome}" th:errorclass="is-invalid">
+                    <div class="invalid-feedback" th:errors="*{nome}"></div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="crm">CRM</label>
+                        <input type="text" class="form-control" th:field="*{crm}" th:errorclass="is-invalid"
+                               data-mascara="crm" placeholder="CRM-TO 1234">
+                        <div class="invalid-feedback" th:errors="*{crm}"></div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="especialidade">Especialidade</label>
+                        <input type="text" class="form-control" th:field="*{especialidade}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{especialidade}"></div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="telefone">Telefone</label>
+                        <input type="text" class="form-control" th:field="*{telefone}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{telefone}"></div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="email">E-mail</label>
+                        <input type="text" class="form-control" th:field="*{email}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{email}"></div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a class="btn btn-outline-secondary" th:href="@{/medicos/list}">Cancelar</a>
+                </div>
+            </form>
         </div>
-        <input type="hidden" th:field="*{id}" th:errorclass="is-invalid">
-
-        <small class="erro" th:if="${#fields.hasErrors('id')}" th:errors="*{id}"></small>
-
-        <label>Nome</label>
-        <input type="text" th:field="*{nome}" th:errorclass="is-invalid" maxlength="120" required>
-        <small class="erro" th:if="${#fields.hasErrors('nome')}" th:errors="*{nome}"></small>
-
-        <label>CRM</label>
-        <input type="text" th:field="*{crm}" th:errorclass="is-invalid" maxlength="20" required>
-        <small class="erro" th:if="${#fields.hasErrors('crm')}" th:errors="*{crm}"></small>
-
-        <label>Especialidade</label>
-        <input type="text" th:field="*{especialidade}" th:errorclass="is-invalid" maxlength="80" required>
-        <small class="erro" th:if="${#fields.hasErrors('especialidade')}" th:errors="*{especialidade}"></small>
-
-        <label>Telefone</label>
-        <input type="text" th:field="*{telefone}" th:errorclass="is-invalid" maxlength="20">
-        <small class="erro" th:if="${#fields.hasErrors('telefone')}" th:errors="*{telefone}"></small>
-
-        <label>E-mail</label>
-        <input type="email" th:field="*{email}" th:errorclass="is-invalid" maxlength="120">
-        <small class="erro" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></small>
-
-        <button type="submit">Salvar</button>
-    </form>
+    </div>
 </main>
+
+<script th:src="@{/js/mascaras.js}"></script>
 
 </body>
 </html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+
+<!-- <head> comum: Bootstrap 5.3 + ajustes de cor da clínica -->
+<head th:fragment="head(titulo)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="|${titulo} · Clínica IFTO|">Clínica IFTO</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" th:href="@{/css/estilo.css}">
+</head>
+
+<body>
+
+<!-- Barra de navegação comum a todas as páginas -->
+<nav th:fragment="navbar" class="navbar navbar-expand navbar-clinica mb-4" data-bs-theme="dark">
+    <div class="container">
+        <a class="navbar-brand fw-bold" th:href="@{/}">Clínica IFTO</a>
+        <div class="navbar-nav">
+            <a class="nav-link" th:href="@{/pacientes/list}">Pacientes</a>
+            <a class="nav-link" th:href="@{/medicos/list}">Médicos</a>
+            <a class="nav-link" th:href="@{/consultas/list}">Consultas</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Mensagem de sucesso enviada pelo controller via RedirectAttributes (flash) -->
+<div th:fragment="mensagem" th:if="${mensagem}" class="alert alert-success" role="alert"
+     th:text="${mensagem}"></div>
+
+<!-- Resumo de erros: deve ser incluído dentro de um <form th:object> -->
+<div th:fragment="erros" th:if="${#fields.hasAnyErrors()}" class="alert alert-danger" role="alert">
+    <strong>Não foi possível salvar.</strong> Corrija os campos destacados abaixo.
+</div>
+
+</body>
+</html>

@@ -1,77 +1,84 @@
 <!DOCTYPE html>
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta</title>
-    <link rel="stylesheet" th:href="@{/css/estilo.css}">
-</head>
+<head th:replace="~{fragments/layout :: head('Consulta')}"></head>
 <body>
 
-<header>
-    <strong>Clínica IFTO</strong>
-    <nav>
-        <a th:href="@{/consultas/list}">Voltar</a>
-    </nav>
-</header>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
 
-<main>
-    <h1 th:text="${consulta.id == null ? 'Nova consulta' : 'Editar consulta'}"></h1>
+<main class="container">
+    <div class="row">
+        <div class="col-lg-8">
+            <h1 class="h3 mb-3" th:text="${consulta.id == null ? 'Nova consulta' : 'Editar consulta'}"></h1>
 
-    <form class="cartao"
-          th:action="${consulta.id == null} ? @{/consultas/save} : @{/consultas/update}"
-          th:object="${consulta}"
-          method="post">
-        <div class="erros" role="alert" th:if="${#fields.hasAnyErrors()}">
-            <p>Corrija os dados abaixo:</p>
-            <ul><li th:each="erro : ${#fields.detailedErrors()}" th:text="${erro.message}"></li></ul>
+            <!-- novalidate: o navegador não valida nada; quem valida é o back-end -->
+            <form class="card card-body border-0 shadow-sm"
+                  th:action="${consulta.id == null} ? @{/consultas/save} : @{/consultas/update}"
+                  th:object="${consulta}"
+                  method="post"
+                  novalidate>
+                <input type="hidden" th:field="*{id}">
+
+                <div th:replace="~{fragments/layout :: erros}"></div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="paciente.id">Paciente</label>
+                        <select class="form-select" th:field="*{paciente.id}" th:errorclass="is-invalid">
+                            <option value="">Selecione</option>
+                            <option th:each="paciente : ${pacientes}"
+                                    th:value="${paciente.id}"
+                                    th:text="${paciente.nome}">
+                            </option>
+                        </select>
+                        <div class="invalid-feedback" th:errors="*{paciente.id}"></div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="medico.id">Médico</label>
+                        <select class="form-select" th:field="*{medico.id}" th:errorclass="is-invalid">
+                            <option value="">Selecione</option>
+                            <option th:each="medico : ${medicos}"
+                                    th:value="${medico.id}"
+                                    th:text="${medico.nome + ' - ' + medico.especialidade}">
+                            </option>
+                        </select>
+                        <div class="invalid-feedback" th:errors="*{medico.id}"></div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="dataHora">Data e hora</label>
+                        <input type="datetime-local" class="form-control" th:field="*{dataHora}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{dataHora}"></div>
+                    </div>
+
+                    <!-- O status só pode ser alterado na edição: toda consulta nova nasce "Agendada" -->
+                    <div class="col-md-6 mb-3" th:if="${consulta.id != null}">
+                        <label class="form-label" for="status">Status</label>
+                        <select class="form-select" th:field="*{status}" th:errorclass="is-invalid">
+                            <option th:each="situacao : ${statusDisponiveis}"
+                                    th:value="${situacao}"
+                                    th:text="${situacao.descricao}">
+                            </option>
+                        </select>
+                        <div class="invalid-feedback" th:errors="*{status}"></div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="observacoes">Observações</label>
+                    <textarea class="form-control" rows="4" th:field="*{observacoes}" th:errorclass="is-invalid"></textarea>
+                    <div class="invalid-feedback" th:errors="*{observacoes}"></div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a class="btn btn-outline-secondary" th:href="@{/consultas/list}">Cancelar</a>
+                </div>
+            </form>
         </div>
-        <input type="hidden" th:field="*{id}" th:errorclass="is-invalid">
-
-        <small class="erro" th:if="${#fields.hasErrors('id')}" th:errors="*{id}"></small>
-
-        <label>Paciente</label>
-        <select th:field="*{paciente.id}" th:errorclass="is-invalid" required>
-            <option value="">Selecione</option>
-            <option th:each="paciente : ${pacientes}"
-                    th:value="${paciente.id}"
-                    th:text="${paciente.nome}">
-            </option>
-        </select>
-
-        <small class="erro" th:if="${#fields.hasErrors('paciente.id')}" th:errors="*{paciente.id}"></small>
-
-        <label>Médico</label>
-        <select th:field="*{medico.id}" th:errorclass="is-invalid" required>
-            <option value="">Selecione</option>
-            <option th:each="medico : ${medicos}"
-                    th:value="${medico.id}"
-                    th:text="${medico.nome + ' - ' + medico.especialidade}">
-            </option>
-        </select>
-
-        <small class="erro" th:if="${#fields.hasErrors('medico.id')}" th:errors="*{medico.id}"></small>
-
-        <label>Data e hora</label>
-        <input type="datetime-local" th:field="*{dataHora}" th:errorclass="is-invalid" required>
-        <small class="erro" th:if="${#fields.hasErrors('dataHora')}" th:errors="*{dataHora}"></small>
-
-        <label>Status</label>
-        <select th:field="*{status}" th:errorclass="is-invalid" required>
-            <option th:each="situacao : ${statusDisponiveis}"
-                    th:value="${situacao}"
-                    th:text="${situacao.descricao}">
-            </option>
-        </select>
-
-        <small class="erro" th:if="${#fields.hasErrors('status')}" th:errors="*{status}"></small>
-
-        <label>Observações</label>
-        <textarea th:field="*{observacoes}" th:errorclass="is-invalid" maxlength="500"></textarea>
-        <small class="erro" th:if="${#fields.hasErrors('observacoes')}" th:errors="*{observacoes}"></small>
-
-        <button type="submit">Salvar</button>
-    </form>
+    </div>
 </main>
 
 </body>

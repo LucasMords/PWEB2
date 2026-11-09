@@ -1,30 +1,18 @@
 <!DOCTYPE html>
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clínica</title>
-    <link rel="stylesheet" th:href="@{/css/estilo.css}">
-</head>
+<head th:replace="~{fragments/layout :: head('Início')}"></head>
 <body>
 
-<header>
-    <strong>Clínica IFTO</strong>
-    <nav>
-        <a th:href="@{/pacientes/list}">Pacientes</a>
-        <a th:href="@{/medicos/list}">Médicos</a>
-        <a th:href="@{/consultas/list}">Consultas</a>
-    </nav>
-</header>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
 
-<main>
-    <h1>Sistema de consultas</h1>
-    <p>Cadastre pacientes e médicos e gerencie a agenda de consultas.</p>
+<main class="container">
+    <h1 class="h3">Sistema de consultas</h1>
+    <p class="text-secondary">Cadastre pacientes e médicos e gerencie a agenda de consultas.</p>
 
-    <div class="acoes">
-        <a class="botao" th:href="@{/consultas/form}">Agendar consulta</a>
-        <a class="botao secundario" th:href="@{/pacientes/form}">Novo paciente</a>
-        <a class="botao secundario" th:href="@{/medicos/form}">Novo médico</a>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-primary" th:href="@{/consultas/form}">Agendar consulta</a>
+        <a class="btn btn-outline-secondary" th:href="@{/pacientes/form}">Novo paciente</a>
+        <a class="btn btn-outline-secondary" th:href="@{/medicos/form}">Novo médico</a>
     </div>
 </main>
 

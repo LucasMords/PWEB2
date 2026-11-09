@@ -1,173 +1,38 @@
+/* O layout vem do Bootstrap 5.3; aqui ficam apenas as cores da clínica. */
+
 :root {
-    font-family: Arial, sans-serif;
+    --clinica-verde: #126b5b;
+    --clinica-verde-escuro: #0e5548;
+    --clinica-verde-claro: #e2efec;
+}
+
+body {
     color: #18302b;
     background-color: #f3f7f6;
 }
 
-* {
-    box-sizing: border-box;
+.navbar-clinica {
+    background-color: var(--clinica-verde);
 }
 
-body {
-    margin: 0;
+.btn-primary {
+    --bs-btn-bg: var(--clinica-verde);
+    --bs-btn-border-color: var(--clinica-verde);
+    --bs-btn-hover-bg: var(--clinica-verde-escuro);
+    --bs-btn-hover-border-color: var(--clinica-verde-escuro);
+    --bs-btn-active-bg: var(--clinica-verde-escuro);
+    --bs-btn-active-border-color: var(--clinica-verde-escuro);
+    --bs-btn-disabled-bg: var(--clinica-verde);
+    --bs-btn-disabled-border-color: var(--clinica-verde);
 }
 
-header {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-    padding: 1rem 5%;
-    color: white;
-    background-color: #126b5b;
+.table thead th {
+    background-color: var(--clinica-verde-claro);
 }
 
-header strong {
-    font-size: 1.25rem;
-}
-
-nav {
-    display: flex;
-    gap: 1rem;
-}
-
-nav a {
-    color: white;
-    text-decoration: none;
-}
-
-main {
-    max-width: 1100px;
-    margin: 2rem auto;
-    padding: 0 1.25rem;
-}
-
-.topo {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.acoes {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-}
-
-.botao,
-button {
-    padding: 0.6rem 0.85rem;
-    border: 0;
-    border-radius: 0.4rem;
-    color: white;
-    background-color: #126b5b;
-    font-size: 0.9rem;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.secundario {
-    background-color: #607772;
-}
-
-.perigo {
-    background-color: #ad3f3f;
-}
-
-.tabela {
-    overflow-x: auto;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: white;
-}
-
-th,
-td {
-    padding: 0.8rem;
-    border-bottom: 1px solid #dce8e5;
-    text-align: left;
-}
-
-th {
-    background-color: #e2efec;
-}
-
-.cartao {
-    max-width: 700px;
-    padding: 1.5rem;
-    border-radius: 0.5rem;
-    background-color: white;
-}
-
-label {
-    display: block;
-    margin-top: 0.9rem;
-    margin-bottom: 0.3rem;
-    font-weight: bold;
-}
-
-input,
-select,
-textarea {
-    width: 100%;
-    padding: 0.65rem;
-    border: 1px solid #aebfbb;
-    border-radius: 0.35rem;
-    font: inherit;
-}
-
-textarea {
-    min-height: 100px;
-    margin-bottom: 1rem;
-    resize: vertical;
-}
-
-.cartao button {
-    margin-top: 1rem;
-}
-
-.vazio {
-    padding: 1.5rem;
-    border-radius: 0.4rem;
-    background-color: white;
-}
-
-.erro,
-.erros {
-    color: #9f2020;
-}
-
-.is-invalid {
-    border: 2px solid #9f2020;
-}
-
-.sucesso {
-    padding: 1rem;
-    color: #14532d;
-    background: #f0fdf4;
-    border: 1px solid #14532d;
-    border-radius: 0.4rem;
-}
-
-.erros {
-    padding: 1rem;
-    border: 1px solid #9f2020;
-    border-radius: 0.4rem;
-    background: #fff4f4;
-}
-
-.acoes form {
-    margin: 0;
-}
-
-@media (max-width: 700px) {
-    header,
-    .topo {
-        align-items: flex-start;
-        flex-direction: column;
-    }
+/* Foco dos campos válidos no verde da clínica (os inválidos mantêm o vermelho do Bootstrap). */
+.form-control:not(.is-invalid):focus,
+.form-select:not(.is-invalid):focus {
+    border-color: var(--clinica-verde);
+    box-shadow: 0 0 0 0.25rem rgba(18, 107, 91, 0.25);
 }

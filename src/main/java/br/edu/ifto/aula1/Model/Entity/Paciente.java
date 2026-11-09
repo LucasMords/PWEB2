@@ -1,9 +1,6 @@
 package br.edu.ifto.aula1.Model.Entity;
 
-import br.edu.ifto.aula1.Validation.Cadastro;
-import br.edu.ifto.aula1.Validation.Edicao;
-import br.edu.ifto.aula1.Validation.Referencia;
-import jakarta.validation.constraints.*;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -12,6 +9,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.br.CPF;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
@@ -24,37 +27,36 @@ public class Paciente {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Null(groups = Cadastro.class, message = "{registro.id.cadastro}")
-    @NotNull(groups = {Edicao.class, Referencia.class}, message = "{registro.id.obrigatorio}")
-    @Positive(groups = {Edicao.class, Referencia.class}, message = "{registro.id.positivo}")
     private Long id;
 
+    @NotBlank(message = "Informe o nome.")
+    @Size(max = 120, message = "O nome deve ter no máximo {max} caracteres.")
     @Column(nullable = false, length = 120)
-    @NotBlank(message = "{nome.obrigatorio}")
-    @Size(max = 120, message = "{texto.tamanho}")
     private String nome;
 
+    // O setter padroniza o formato (000.000.000-00) e o @CPF confere os dígitos verificadores.
+    // O @CPF sozinho aceita o CPF com ou sem pontuação, por isso o setter continua necessário.
+    @NotBlank(message = "Informe o CPF.")
+    @CPF(message = "Informe um CPF válido.")
     @Column(nullable = false, unique = true, length = 14)
-    @NotBlank(message = "{paciente.cpf.obrigatorio}")
-    @org.hibernate.validator.constraints.br.CPF(message = "{paciente.cpf.formato}")
     private String cpf;
 
+    @NotNull(message = "Informe a data de nascimento.")
+    @Past(message = "A data de nascimento deve estar no passado.")
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     @Column(name = "data_nascimento", nullable = false)
-    @NotNull(message = "{paciente.nascimento.obrigatorio}")
-    @PastOrPresent(message = "{paciente.nascimento.futuro}")
     private LocalDate dataNascimento;
 
+    @Size(max = 20, message = "O telefone não pode ter mais que {max} caracteres.")
     @Column(length = 20)
-    @Pattern(regexp = "^$|[0-9]{10,11}", message = "{telefone.formato}")
     private String telefone;
 
+    @Email(message = "Informe um e-mail válido.")
+    @Size(max = 120, message = "O email não pode ter mais que {max} caracteres.")
     @Column(length = 120)
-    @Email(message = "{email.formato}")
-    @Size(max = 120, message = "{texto.tamanho}")
     private String email;
 
-    @OneToMany(mappedBy = "paciente")
+    @OneToMany(mappedBy = "paciente", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("dataHora DESC")
     private List<Consulta> consultas = new ArrayList<>();
 
@@ -71,7 +73,7 @@ public class Paciente {
     }
 
     public void setNome(String nome) {
-        this.nome = nome == null ? null : nome.strip();
+        this.nome = nome;
     }
 
     public String getCpf() {
@@ -79,7 +81,24 @@ public class Paciente {
     }
 
     public void setCpf(String cpf) {
-        this.cpf = cpf == null ? null : cpf.strip().replaceAll("[.\\-]", "");
+        this.cpf = formatarCpf(cpf);
+    }
+
+    /**
+     * Padroniza o CPF como 000.000.000-00, tenha ele sido digitado com ou sem pontuação,
+     * para que o banco nunca guarde o mesmo CPF em dois formatos.
+     * Se não houver 11 dígitos, devolve o texto como veio e a validação o rejeita.
+     */
+    private static String formatarCpf(String cpf) {
+        // Em branco vira null: o @CPF ignora null, então só o @NotBlank ("Informe o CPF.") aparece.
+        if (cpf == null || cpf.isBlank())
+            return null;
+
+        String digitos = cpf.replaceAll("\\D", "");
+        if (digitos.length() != 11)
+            return cpf.trim();
+
+        return digitos.replaceFirst("(\\d{3})(\\d{3})(\\d{3})(\\d{2})", "$1.$2.$3-$4");
     }
 
     public LocalDate getDataNascimento() {
@@ -95,7 +114,7 @@ public class Paciente {
     }
 
     public void setTelefone(String telefone) {
-        this.telefone = telefone == null ? null : telefone.strip().replaceAll("[() .\\-]", "");
+        this.telefone = telefone;
     }
 
     public String getEmail() {
@@ -103,7 +122,7 @@ public class Paciente {
     }
 
     public void setEmail(String email) {
-        this.email = email == null ? null : email.strip();
+        this.email = email;
     }
 
     public List<Consulta> getConsultas() {
