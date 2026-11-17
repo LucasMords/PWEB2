@@ -29,6 +29,7 @@
             <a class="nav-link" th:href="@{/pacientes/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Pacientes</a>
             <a class="nav-link" th:href="@{/medicos/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Médicos</a>
             <a class="nav-link" th:href="@{/agenda/list}" sec:authorize="isAuthenticated()">Horários disponíveis</a>
+            <a class="nav-link" th:href="@{/agenda/dia}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Agenda do dia</a>
             <a class="nav-link" th:href="@{/agendamentos/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Agendamentos</a>
             <a class="nav-link" th:href="@{/consultas/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Consultas</a>
             <a class="nav-link" th:href="@{/usuario/agendamentos}" sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Meus agendamentos</a>

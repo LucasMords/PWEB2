@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Reagendar')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container" th:with="atual=${agendamento.agenda}">
+    <h1 class="h3 mb-1">Reagendar</h1>
+    <p class="text-secondary">
+        Escolha um novo horário com o mesmo médico. O agendamento atual é cancelado e o novo é criado
+        ao mesmo tempo; se o horário escolhido não estiver mais livre, nada muda.
+    </p>
+
+    <div th:replace="~{fragments/layout :: erro}"></div>
+
+    <div class="card card-body border-0 shadow-sm mb-3">
+        <h2 class="h6">Agendamento atual</h2>
+        <dl class="row mb-0">
+            <dt class="col-sm-2">Paciente</dt>
+            <dd class="col-sm-10" th:text="${agendamento.paciente.nome}"></dd>
+            <dt class="col-sm-2">Médico</dt>
+            <dd class="col-sm-10" th:text="|${atual.medico.nome} · ${atual.medico.especialidade}|"></dd>
+            <dt class="col-sm-2">Horário</dt>
+            <dd class="col-sm-10 mb-0"
+                th:text="|${#temporals.format(atual.data, 'dd/MM/yyyy')} às ${#temporals.format(atual.horario, 'HH:mm')}|"></dd>
+        </dl>
+    </div>
+
+    <form class="card card-body border-0 shadow-sm mb-3" method="get"
+          th:action="@{/agendamentos/reagendar/{id}(id=${agendamento.id})}" th:object="${filtro}">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label" for="data">Data do novo horário</label>
+                <input type="date" class="form-control" th:field="*{data}">
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+                <a class="btn btn-outline-secondary" th:href="@{/agendamentos/reagendar/{id}(id=${agendamento.id})}">Todas as datas</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="alert alert-light border" th:if="${pagina.empty}">
+        Nenhum horário livre deste médico encontrado.
+    </div>
+
+    <div class="card border-0 shadow-sm" th:unless="${pagina.empty}">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Horário</th>
+                    <th>Ação</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="horario : ${pagina.content}">
+                    <td th:text="${#temporals.format(horario.data, 'dd/MM/yyyy')}"></td>
+                    <td th:text="${#temporals.format(horario.horario, 'HH:mm')}"></td>
+                    <td>
+                        <!-- POST com o token CSRF (th:action) -->
+                        <form method="post" class="m-0" th:action="@{/agendamentos/reagendar/{id}(id=${agendamento.id})}">
+                            <input type="hidden" name="agendaId" th:value="${horario.id}">
+                            <button type="submit" class="btn btn-sm btn-primary">Remarcar para este horário</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <nav class="mt-3" aria-label="Páginas de horários" th:if="${pagina.totalPages > 1}">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item" th:classappend="${pagina.first} ? 'disabled'">
+                <a class="page-link"
+                   th:href="@{/agendamentos/reagendar/{id}(id=${agendamento.id}, page=${pagina.number - 1}, data=${filtro.data})}">Anterior</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link" th:text="|Página ${pagina.number + 1} de ${pagina.totalPages}|"></span>
+            </li>
+            <li class="page-item" th:classappend="${pagina.last} ? 'disabled'">
+                <a class="page-link"
+                   th:href="@{/agendamentos/reagendar/{id}(id=${agendamento.id}, page=${pagina.number + 1}, data=${filtro.data})}">Próxima</a>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="mt-3">
+        <a class="btn btn-outline-secondary" th:href="@{${voltar}}">Voltar</a>
+    </div>
+</main>
+
+</body>
+</html>

@@ -5,6 +5,7 @@ import br.edu.ifto.aula1.Model.Entity.StatusAgendamento;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -23,6 +24,23 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
 
     /** Todos os agendamentos de um horário, do mais antigo ao mais novo (histórico). */
     List<Agendamento> findByAgendaIdOrderByIdAsc(Long agendaId);
+
+    /** Agendamento com horário, médico e paciente, para telas que mostram um só (ex.: reagendamento). */
+    @EntityGraph(attributePaths = {"agenda", "agenda.medico", "paciente"})
+    Optional<Agendamento> findDetalhadoById(Long id);
+
+    /** Agendamentos que ocupam horários do dia (todos menos os cancelados), com o paciente. */
+    @Query("""
+            select ag from Agendamento ag
+              join fetch ag.agenda a
+              join fetch ag.paciente p
+            where a.data = :data
+              and ag.status <> :cancelado
+              and (:medicoId is null or a.medico.id = :medicoId)
+            """)
+    List<Agendamento> buscarAtivosDoDia(@Param("data") LocalDate data,
+                                        @Param("medicoId") Long medicoId,
+                                        @Param("cancelado") StatusAgendamento cancelado);
 
     /**
      * Lê o agendamento com bloqueio pessimista, para que cancelamento e confirmação de

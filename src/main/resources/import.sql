@@ -57,4 +57,4 @@ INSERT INTO agendamentos (agenda_id, paciente_id, data_criacao, status, reserva_
 INSERT INTO agendas (medico_id, data, horario, status) VALUES (1, '2026-09-10', '08:00:00', 'AGENDADO');
 INSERT INTO agendamentos (agenda_id, paciente_id, data_criacao, status, reserva_ativa) VALUES ((SELECT id FROM agendas WHERE medico_id = 1 AND data = '2026-09-10' AND horario = '08:00:00'), 2, '2026-09-01 11:20:00', 'FALTOU', TRUE);
 -- Um agendamento cancelado (Carlos com o Dr. Eduardo): fica no historico e o horario voltou a ficar livre.
-INSERT INTO agendamentos (agenda_id, paciente_id, data_criacao, status, reserva_ativa) VALUES ((SELECT id FROM agendas WHERE medico_id = 2 AND data = DATEADD(DAY, 3, CURRENT_DATE) AND horario = '15:00:00'), 2, CURRENT_TIMESTAMP, 'CANCELADO', NULL);
+INSERT INTO agendamentos (agenda_id, paciente_id, data_criacao, status, reserva_ativa, data_cancelamento, cancelado_por, motivo_cancelamento) VALUES ((SELECT id FROM agendas WHERE medico_id = 2 AND data = DATEADD(DAY, 3, CURRENT_DATE) AND horario = '15:00:00'), 2, CURRENT_TIMESTAMP, 'CANCELADO', NULL, CURRENT_TIMESTAMP, 'carlos.lima', 'Imprevisto no trabalho.');

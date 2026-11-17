@@ -43,11 +43,13 @@ public class SecurityConfiguration {
                         // O console H2 também exige ADMIN.
                         .requestMatchers("/h2-console/**").hasRole(Perfil.ADMIN)
 
-                        // Agenda: qualquer usuário autenticado vê os horários livres, agenda e
-                        // cancela. O paciente só age em nome próprio (conferido nos controllers e
+                        // Agenda: qualquer usuário autenticado vê os horários livres, agenda,
+                        // reagenda e cancela. O paciente só age em nome próprio (conferido nos controllers e
                         // no AgendamentoService); a equipe escolhe o paciente.
-                        .requestMatchers(HttpMethod.GET, "/agenda/list", "/agendamentos/novo/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/agendamentos/save", "/agendamentos/cancelar/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/agenda/list", "/agendamentos/novo/**",
+                                "/agendamentos/reagendar/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/agendamentos/save", "/agendamentos/cancelar/**",
+                                "/agendamentos/reagendar/**").authenticated()
                         // Confirmar a presença (o que cria a Consulta) e registrar falta é só da
                         // administração e da recepção.
                         .requestMatchers("/agendamentos/confirmar/**", "/agendamentos/falta/**")

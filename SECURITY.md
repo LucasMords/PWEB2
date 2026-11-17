@@ -64,11 +64,13 @@ remember-me cookies stop being valid.
   registration (`GET /pacientes/form`, `POST /pacientes/save`).
 - Any authenticated user: `/`, `/usuario/**` (own data, own bookings and own
   appointments), the available time slots (`GET /agenda/list`), booking a slot
-  (`GET /agendamentos/novo/{agendaId}`, `POST /agendamentos/save`) and
-  cancelling a booking (`POST /agendamentos/cancelar/{id}`).
+  (`GET /agendamentos/novo/{agendaId}`, `POST /agendamentos/save`),
+  cancelling a booking (`POST /agendamentos/cancelar/{id}`) and moving it to
+  another slot (`/agendamentos/reagendar/{id}`).
 - `ADMIN`, `USER` and `MEDICO`: patients, the list of doctors, registering time
   slots (`/agenda/form`, `POST /agenda/save`, and in batch: `/agenda/lote`), the
-  booking management page (`/agendamentos/list`) and the appointment history
+  booking management page (`/agendamentos/list`), the day schedule
+  (`/agenda/dia`; a `MEDICO` only sees their own) and the appointment history
   (`/consultas/**`).
 - `ADMIN` and `USER` only: confirming a patient's attendance
   (`POST /agendamentos/confirmar/{id}`), which is what creates the `Consulta`, and
@@ -81,9 +83,11 @@ remember-me cookies stop being valid.
 - Ownership is enforced on the server, not by the forms:
   - a `PACIENTE` always books for the patient linked to the account; a
     `pacienteId` sent in the request is ignored (`AgendamentoController.save`);
-  - a `PACIENTE` can only cancel their own booking, and only before its time; for
-    anyone else's the answer is `404`, the same as for a booking that does not
-    exist (`AgendamentoService.cancelarDoPaciente`);
+  - a `PACIENTE` can only cancel or reschedule their own booking, and only up to
+    24 hours before its time; for anyone else's the answer is `404`, the same as
+    for a booking that does not exist (`AgendamentoService.cancelar`,
+    `AgendamentoService.reagendar`). Who cancelled (login) and when is stored
+    with the booking; staff see it, patients only see the reason;
   - a `MEDICO` can only register slots in their own schedule, one by one or in
     batch; a `medicoId` sent in the request is ignored (`AgendaController.save`,
     `AgendaController.gerarLote`).
@@ -108,7 +112,8 @@ remember-me cookies stop being valid.
 
 Removals (`/medicos/remove/{id}`, `/pacientes/remove/{id}`) and the booking
 actions (`/agendamentos/save`, `/agendamentos/cancelar/{id}`,
-`/agendamentos/confirmar/{id}`, `/agendamentos/falta/{id}`) are POST requests sent by forms with
+`/agendamentos/confirmar/{id}`, `/agendamentos/falta/{id}`,
+`/agendamentos/reagendar/{id}`) are POST requests sent by forms with
 `th:action`, so they carry the CSRF token like every other form. A GET to those
 URLs answers `405`.
 

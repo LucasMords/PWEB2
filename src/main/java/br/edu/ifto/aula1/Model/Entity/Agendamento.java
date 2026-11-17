@@ -34,6 +34,12 @@ public class Agendamento {
     /** Com quanta antecedência ao horário a presença já pode ser confirmada. */
     public static final Duration ANTECEDENCIA_CONFIRMACAO = Duration.ofHours(1);
 
+    /** Até quanto tempo antes do horário o próprio paciente pode cancelar ou reagendar. */
+    public static final Duration PRAZO_CANCELAMENTO_PACIENTE = Duration.ofHours(24);
+
+    /** Tamanho máximo do motivo do cancelamento. */
+    public static final int MOTIVO_MAXIMO = 255;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -56,6 +62,16 @@ public class Agendamento {
     // TRUE enquanto ocupa o horário (AGENDADO, REALIZADO ou FALTOU); NULL quando CANCELADO.
     @Column(name = "reserva_ativa")
     private Boolean reservaAtiva = Boolean.TRUE;
+
+    // Preenchidos só no cancelamento: histórico de quem cancelou, quando e por quê.
+    @Column(name = "data_cancelamento")
+    private LocalDateTime dataCancelamento;
+
+    @Column(name = "cancelado_por", length = 50)
+    private String canceladoPor;
+
+    @Column(name = "motivo_cancelamento", length = MOTIVO_MAXIMO)
+    private String motivoCancelamento;
 
     protected Agendamento() {
     }
@@ -85,17 +101,24 @@ public class Agendamento {
         return isAgendado() && !agora.isBefore(agenda.getDataHora());
     }
 
-    /** O paciente só cancela antes do horário; a equipe pode cancelar a qualquer momento. */
+    /**
+     * O paciente cancela ou reagenda sozinho até 24 horas antes do horário. Depois disso,
+     * só pela clínica, que pode cancelar a qualquer momento.
+     */
     public boolean permiteCancelamentoPeloPaciente(LocalDateTime agora) {
-        return isAgendado() && agora.isBefore(agenda.getDataHora());
+        return isAgendado() && agora.isBefore(agenda.getDataHora().minus(PRAZO_CANCELAMENTO_PACIENTE));
     }
 
     // As transições abaixo são chamadas pelo AgendamentoService, que confere antes
     // se o agendamento está AGENDADO.
 
-    public void cancelar() {
+    /** Guarda quando, por quem (login) e por que foi cancelado; o motivo é opcional. */
+    public void cancelar(LocalDateTime quando, String por, String motivo) {
         this.status = StatusAgendamento.CANCELADO;
         this.reservaAtiva = null;
+        this.dataCancelamento = quando;
+        this.canceladoPor = por;
+        this.motivoCancelamento = motivo;
     }
 
     public void marcarRealizado() {
@@ -125,5 +148,17 @@ public class Agendamento {
 
     public StatusAgendamento getStatus() {
         return status;
+    }
+
+    public LocalDateTime getDataCancelamento() {
+        return dataCancelamento;
+    }
+
+    public String getCanceladoPor() {
+        return canceladoPor;
+    }
+
+    public String getMotivoCancelamento() {
+        return motivoCancelamento;
     }
 }

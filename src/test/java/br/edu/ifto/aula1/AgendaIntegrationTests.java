@@ -579,7 +579,7 @@ class AgendaIntegrationTests {
 
         mvc.perform(post(url).with(csrf()).with(contaDaAna))
                 .andExpect(redirectedUrl("/usuario/agendamentos"))
-                .andExpect(flash().attribute("erro", "O horário deste agendamento já passou. Fale com a clínica."));
+                .andExpect(flash().attribute("erro", "Só é possível cancelar pelo sistema até 24 horas antes do horário. Entre em contato com a clínica."));
         assertThat(agendamentos.findById(agendamento.getId()).orElseThrow().getStatus())
                 .isEqualTo(StatusAgendamento.AGENDADO);
 
@@ -630,11 +630,133 @@ class AgendaIntegrationTests {
 
         // Um horário pode acumular vários cancelados (a restrição única só conta os ativos).
         Agendamento doCarlos = agendamentos.findByAgendaIdOrderByIdAsc(agenda.getId()).getLast();
-        agendamentoService.cancelar(doCarlos.getId());
+        agendamentoService.cancelar(doCarlos.getId(), null, "user", null);
         agendamentoService.agendar(agenda.getId(), ana.getId());
         assertThat(agendamentos.findByAgendaIdOrderByIdAsc(agenda.getId()))
                 .extracting(Agendamento::getStatus)
                 .containsExactly(StatusAgendamento.CANCELADO, StatusAgendamento.CANCELADO, StatusAgendamento.AGENDADO);
+    }
+
+    @Test
+    void cancelamentoGuardaMotivoEAutorEMostraNaListagem() throws Exception {
+        // Data mais distante que a dos outros testes: "Meus agendamentos" lista do mais novo
+        // para o mais antigo, então este aparece na primeira página do Carlos.
+        Agenda agenda = agendaService.cadastrar(form(eduardo, LocalDate.now().plusYears(10), LocalTime.of(9, 0)));
+        Agendamento agendamento = agendamentoService.agendar(agenda.getId(), carlos.getId());
+
+        mvc.perform(post("/agendamentos/cancelar/" + agendamento.getId()).with(csrf()).with(recepcao)
+                        .param("motivo", "Médico em congresso."))
+                .andExpect(redirectedUrl("/agendamentos/list"));
+
+        Agendamento cancelado = agendamentos.findById(agendamento.getId()).orElseThrow();
+        assertThat(cancelado.getMotivoCancelamento()).isEqualTo("Médico em congresso.");
+        assertThat(cancelado.getCanceladoPor()).isEqualTo("user");
+        assertThat(cancelado.getDataCancelamento()).isNotNull();
+
+        mvc.perform(get("/agendamentos/list").with(recepcao).param("data", agenda.getData().toString()))
+                .andExpect(content().string(containsString("Médico em congresso.")))
+                .andExpect(content().string(containsString("por user em")));
+        // O paciente vê o motivo, mas não quem cancelou.
+        mvc.perform(get("/usuario/agendamentos").with(contaDoCarlos))
+                .andExpect(content().string(containsString("Médico em congresso.")))
+                .andExpect(content().string(not(containsString("por user em"))));
+
+        // Motivo acima de 255 caracteres: rejeitado, nada muda.
+        Agendamento outro = agendamentoService.agendar(novoHorario(eduardo).getId(), carlos.getId());
+        mvc.perform(post("/agendamentos/cancelar/" + outro.getId()).with(csrf()).with(recepcao)
+                        .param("motivo", "x".repeat(256)))
+                .andExpect(flash().attribute("erro", "O motivo deve ter no máximo 255 caracteres."));
+        assertThat(agendamentos.findById(outro.getId()).orElseThrow().getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+    }
+
+    // ---------- Reagendamento ----------
+
+    @Test
+    void pacienteReagendaOProprioAgendamentoParaOutroHorarioDoMesmoMedico() throws Exception {
+        LocalDate data = dataLivre();
+        Agenda atual = agendaService.cadastrar(form(beatriz, data, LocalTime.of(9, 0)));
+        Agenda novo = agendaService.cadastrar(form(beatriz, data, LocalTime.of(10, 0)));
+        Agenda doOutroMedico = agendaService.cadastrar(form(eduardo, data, LocalTime.of(10, 0)));
+        Agendamento agendamento = agendamentoService.agendar(atual.getId(), ana.getId());
+        String url = "/agendamentos/reagendar/" + agendamento.getId();
+
+        // A tela lista só horários livres do mesmo médico.
+        mvc.perform(get(url).with(contaDaAna).param("data", data.toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("name=\"agendaId\" value=\"" + novo.getId() + "\"")))
+                .andExpect(content().string(not(containsString("value=\"" + doOutroMedico.getId() + "\""))));
+        // Outro paciente: como se não existisse.
+        mvc.perform(get(url).with(contaDoCarlos)).andExpect(status().isNotFound());
+        mvc.perform(post(url).with(csrf()).with(contaDoCarlos).param("agendaId", novo.getId().toString()))
+                .andExpect(status().isNotFound());
+        // Médico diferente e o mesmo horário são rejeitados.
+        mvc.perform(post(url).with(csrf()).with(contaDaAna).param("agendaId", doOutroMedico.getId().toString()))
+                .andExpect(flash().attribute("erro", "O reagendamento deve ser com o mesmo médico. "
+                        + "Para trocar de médico, cancele e faça um novo agendamento."));
+        mvc.perform(post(url).with(csrf()).with(contaDaAna).param("agendaId", atual.getId().toString()))
+                .andExpect(flash().attribute("erro", "Escolha um horário diferente do atual."));
+
+        mvc.perform(post(url).with(csrf()).with(contaDaAna).param("agendaId", novo.getId().toString()))
+                .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/usuario/agendamentos"))
+                .andExpect(flash().attribute("mensagem", "Agendamento remarcado para "
+                        + data.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + " às 10:00."));
+
+        Agendamento antigo = agendamentos.findById(agendamento.getId()).orElseThrow();
+        assertThat(antigo.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
+        assertThat(antigo.getMotivoCancelamento()).startsWith("Reagendado para");
+        assertThat(antigo.getCanceladoPor()).isEqualTo("ana.souza");
+        assertThat(statusDaAgenda(atual)).isEqualTo(StatusAgenda.DISPONIVEL);
+        assertThat(statusDaAgenda(novo)).isEqualTo(StatusAgenda.AGENDADO);
+        assertThat(unicoAgendamentoDe(novo).getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+
+        // O agendamento antigo, já cancelado, não pode ser reagendado de novo.
+        mvc.perform(get(url).with(contaDaAna))
+                .andExpect(flash().attribute("erro", "Não é possível reagendar um agendamento cancelado."));
+    }
+
+    // ---------- Agenda do dia ----------
+
+    @Test
+    void agendaDoDiaMostraHorariosLivresEOcupadosPorMedicoEVoltaParaOMesmoDia() throws Exception {
+        LocalDate data = dataLivre();
+        agendaService.cadastrar(form(beatriz, data, LocalTime.of(8, 0)));
+        Agenda ocupado = agendaService.cadastrar(form(beatriz, data, LocalTime.of(9, 0)));
+        Agendamento agendamento = agendamentoService.agendar(ocupado.getId(), carlos.getId());
+
+        mvc.perform(get("/agenda/dia").with(recepcao).param("data", data.toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Dra. Beatriz Rocha")))
+                .andExpect(content().string(containsString("Carlos Lima")))
+                .andExpect(content().string(containsString(">Livre<")))
+                .andExpect(content().string(containsString("2 horários")))
+                .andExpect(content().string(containsString("1 livres")))
+                .andExpect(content().string(containsString("1 aguardando")))
+                .andExpect(content().string(containsString("name=\"origem\" value=\"dia\"")));
+
+        // O Dr. Eduardo vê só a própria agenda, mesmo pedindo a da Dra. Beatriz.
+        mvc.perform(get("/agenda/dia").with(httpBasic("eduardo.melo", "Medico123"))
+                        .param("data", data.toString()).param("medicoId", beatriz.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("Carlos Lima"))))
+                .andExpect(content().string(containsString("Nenhum horário cadastrado nesta data.")));
+        // Paciente não entra; parâmetros inválidos não derrubam a página.
+        mvc.perform(get("/agenda/dia").with(contaDaAna)).andExpect(status().isForbidden());
+        mvc.perform(get("/agenda/dia").with(recepcao).param("data", "ontem").param("medicoId", "x"))
+                .andExpect(status().isOk());
+
+        // Ação feita na agenda do dia: volta para o mesmo dia, inclusive em caso de erro.
+        mvc.perform(post("/agendamentos/confirmar/" + agendamento.getId()).with(csrf()).with(recepcao)
+                        .param("origem", "dia").param("data", data.toString()))
+                .andExpect(redirectedUrl("/agenda/dia?data=" + data))
+                .andExpect(flash().attributeExists("erro")); // ainda não é o horário
+        mvc.perform(post("/agendamentos/cancelar/" + agendamento.getId()).with(csrf()).with(recepcao)
+                        .param("origem", "dia").param("data", data.toString()))
+                .andExpect(redirectedUrl("/agenda/dia?data=" + data))
+                .andExpect(flash().attributeExists("mensagem"));
+        // O destino nunca vem da requisição: data que não é data volta para a agenda de hoje.
+        mvc.perform(post("/agendamentos/cancelar/" + agendamento.getId()).with(csrf()).with(recepcao)
+                        .param("origem", "dia").param("data", "//sitemalicioso.com"))
+                .andExpect(redirectedUrl("/agenda/dia"));
     }
 
     // ---------- Gerenciamento e acesso ----------

@@ -5,6 +5,7 @@ import br.edu.ifto.aula1.Dto.AgendaForm;
 import br.edu.ifto.aula1.Dto.AgendaLoteForm;
 import br.edu.ifto.aula1.Model.Entity.Medico;
 import br.edu.ifto.aula1.Security.Papeis;
+import br.edu.ifto.aula1.Service.AgendaDoDiaService;
 import br.edu.ifto.aula1.Service.AgendaService;
 import br.edu.ifto.aula1.Service.MedicoService;
 import br.edu.ifto.aula1.Service.RegraNegocioException;
@@ -23,12 +24,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.format.TextStyle;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /** Horários da agenda dos médicos: cadastro de disponibilidade e consulta dos horários livres. */
 @Controller
@@ -36,6 +42,9 @@ import java.util.Map;
 public class AgendaController {
 
     private static final int TAMANHO_PAGINA = 10;
+
+    private static final DateTimeFormatter DATA_POR_EXTENSO =
+            DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale.of("pt", "BR"));
 
     /** Dias da semana do formulário de lote, na ordem de segunda a domingo, com o nome em português. */
     private static final Map<DayOfWeek, String> DIAS_DA_SEMANA = new LinkedHashMap<>();
@@ -48,10 +57,55 @@ public class AgendaController {
 
     private final AgendaService service;
     private final MedicoService medicoService;
+    private final AgendaDoDiaService agendaDoDiaService;
+    private final Clock clock;
 
-    public AgendaController(AgendaService service, MedicoService medicoService) {
+    public AgendaController(AgendaService service, MedicoService medicoService,
+                            AgendaDoDiaService agendaDoDiaService, Clock clock) {
         this.service = service;
         this.medicoService = medicoService;
+        this.agendaDoDiaService = agendaDoDiaService;
+        this.clock = clock;
+    }
+
+    /**
+     * Agenda do dia: todos os horários de uma data, por médico, com o paciente e as ações
+     * (confirmar presença, falta, cancelar). Sem data, mostra hoje; data inválida também.
+     * O médico vê só a própria agenda; administração e recepção podem filtrar por médico.
+     */
+    @GetMapping("/dia")
+    public ModelAndView dia(@RequestParam(name = "data", required = false) String dataInformada,
+                            @RequestParam(name = "medicoId", required = false) String medicoInformado,
+                            Authentication autenticacao, ModelMap model) {
+        LocalDate data = lerData(dataInformada).orElse(LocalDate.now(clock));
+
+        Medico medicoAutenticado = medicoRestrito(autenticacao);
+        Long medicoId = medicoAutenticado != null ? medicoAutenticado.getId() : lerId(medicoInformado);
+
+        model.addAttribute("agendaDoDia", agendaDoDiaService.montar(data, medicoId));
+        model.addAttribute("medicoId", medicoId);
+        model.addAttribute("dataPorExtenso", data.format(DATA_POR_EXTENSO));
+        model.addAttribute("hoje", LocalDate.now(clock));
+        model.addAttribute("agora", LocalDateTime.now(clock));
+        if (medicoAutenticado == null)
+            model.addAttribute("medicos", medicoService.listar());
+        return new ModelAndView("agenda/dia", model);
+    }
+
+    private static Optional<LocalDate> lerData(String texto) {
+        try {
+            return texto == null || texto.isBlank() ? Optional.empty() : Optional.of(LocalDate.parse(texto));
+        } catch (DateTimeParseException e) {
+            return Optional.empty();
+        }
+    }
+
+    private static Long lerId(String texto) {
+        try {
+            return texto == null || texto.isBlank() ? null : Long.valueOf(texto);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** Horários disponíveis. Filtro inválido (ex.: data mal formada) é tratado como filtro vazio. */

@@ -25,6 +25,15 @@ public interface AgendaRepository extends JpaRepository<Agenda, Long> {
     /** Horários já cadastrados do médico no período, para a geração em lote pular os repetidos. */
     List<Agenda> findByMedicoIdAndDataBetween(Long medicoId, LocalDate inicio, LocalDate fim);
 
+    /** Todos os horários do dia (livres ou não), com o médico, para a agenda do dia. */
+    @Query("""
+            select a from Agenda a join fetch a.medico m
+            where a.data = :data
+              and (:medicoId is null or m.id = :medicoId)
+            order by m.nome, m.id, a.horario
+            """)
+    List<Agenda> buscarDoDia(@Param("data") LocalDate data, @Param("medicoId") Long medicoId);
+
     // O médico é LAZY e o open-in-view está desligado: a tela de confirmação precisa dele.
     @EntityGraph(attributePaths = "medico")
     Optional<Agenda> findComMedicoById(Long id);

@@ -10,7 +10,9 @@ document.querySelectorAll('.modal[data-confirmacao]').forEach(modal => {
         const botao = evento.relatedTarget;
         if (!botao) return;
 
-        modal.querySelector('form').action = botao.dataset.acao;
+        const form = modal.querySelector('form');
+        form.reset(); // limpa o que foi digitado (ex.: motivo) para outro agendamento
+        form.action = botao.dataset.acao;
 
         const descricao = modal.querySelector('[data-descricao]');
         if (descricao) descricao.textContent = botao.dataset.descricao || '';

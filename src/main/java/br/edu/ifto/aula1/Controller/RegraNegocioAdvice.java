@@ -34,6 +34,13 @@ public class RegraNegocioAdvice {
     /** Os destinos são fixos: nada da requisição entra na URL de redirecionamento. */
     private static String destino(String caminho, HttpServletRequest request) {
 
+        // Ação feita na agenda do dia: volta para ela, no mesmo dia.
+        if (caminho.startsWith("/agendamentos")) {
+            var agendaDoDia = Retorno.agendaDoDia(request);
+            if (agendaDoDia.isPresent())
+                return agendaDoDia.get();
+        }
+
         // Ao tentar reservar um horário que não está mais livre, o melhor destino é escolher outro.
         if (caminho.startsWith("/agendamentos/novo") || caminho.startsWith("/agendamentos/save"))
             return "/agenda/list";

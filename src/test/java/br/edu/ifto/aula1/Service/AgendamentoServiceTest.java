@@ -19,7 +19,9 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Optional;
 
@@ -42,11 +44,12 @@ class AgendamentoServiceTest {
     private static final Long AGENDA_ID = 10L;
     private static final Long AGENDAMENTO_ID = 20L;
     private static final Long PACIENTE_ID = 1L;
+    private static final String RECEPCAO = "user";
     private static final ZoneId FUSO = ZoneId.systemDefault();
 
-    // Hoje é 10/01/2030, 10h; a consulta de teste é amanhã às 9h.
+    // Hoje é 10/01/2030, 10h; a consulta de teste é depois de amanhã às 9h (fora do prazo de 24h).
     private static final LocalDateTime AGORA = LocalDateTime.of(2030, 1, 10, 10, 0);
-    private static final LocalDateTime HORARIO_CONSULTA = LocalDateTime.of(2030, 1, 11, 9, 0);
+    private static final LocalDateTime HORARIO_CONSULTA = LocalDateTime.of(2030, 1, 12, 9, 0);
 
     @Mock private AgendamentoRepository repository;
     @Mock private AgendaRepository agendaRepository;
@@ -210,7 +213,7 @@ class AgendamentoServiceTest {
     @Test
     void naoConfirmaPresencaDeAgendamentoCancelado() {
         Agendamento agendamento = agendamentoExistente();
-        service.cancelar(AGENDAMENTO_ID);
+        service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, null);
         relogioEm(HORARIO_CONSULTA);
 
         assertThatThrownBy(() -> service.confirmarPresenca(AGENDAMENTO_ID))
@@ -255,7 +258,7 @@ class AgendamentoServiceTest {
                 .isInstanceOf(RegraNegocioException.class).hasMessage("A falta deste agendamento já foi registrada.");
         assertThatThrownBy(() -> service.confirmarPresenca(AGENDAMENTO_ID))
                 .isInstanceOf(RegraNegocioException.class).hasMessage("A falta deste agendamento já foi registrada.");
-        assertThatThrownBy(() -> service.cancelar(AGENDAMENTO_ID))
+        assertThatThrownBy(() -> service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, null))
                 .isInstanceOf(RegraNegocioException.class)
                 .hasMessage("Não é possível cancelar um agendamento com falta registrada.");
         assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.FALTOU);
@@ -271,7 +274,7 @@ class AgendamentoServiceTest {
                 .isInstanceOf(RegraNegocioException.class).hasMessage("A presença deste agendamento já foi confirmada.");
 
         Agendamento cancelado = new Agendamento(horario(HORARIO_CONSULTA.minusDays(1)), paciente, AGORA);
-        cancelado.cancelar();
+        cancelado.cancelar(AGORA, RECEPCAO, null);
         when(repository.buscarComBloqueio(21L)).thenReturn(Optional.of(cancelado));
         assertThatThrownBy(() -> service.registrarFalta(21L))
                 .isInstanceOf(RegraNegocioException.class)
@@ -284,7 +287,7 @@ class AgendamentoServiceTest {
     void cancelamentoMantemORegistroELiberaOHorario() {
         Agendamento agendamento = agendamentoExistente();
 
-        service.cancelar(AGENDAMENTO_ID);
+        service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, null);
 
         assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
         assertThat(agenda.getStatus()).isEqualTo(StatusAgenda.DISPONIVEL);
@@ -294,7 +297,7 @@ class AgendamentoServiceTest {
     @Test
     void horarioCanceladoPodeSerAgendadoDeNovoComUmNovoRegistro() {
         Agendamento cancelado = agendamentoExistente();
-        service.cancelar(AGENDAMENTO_ID);
+        service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, null);
 
         Agendamento novo = service.agendar(AGENDA_ID, PACIENTE_ID);
 
@@ -310,7 +313,7 @@ class AgendamentoServiceTest {
         relogioEm(HORARIO_CONSULTA);
         service.confirmarPresenca(AGENDAMENTO_ID);
 
-        assertThatThrownBy(() -> service.cancelar(AGENDAMENTO_ID))
+        assertThatThrownBy(() -> service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, null))
                 .isInstanceOf(RegraNegocioException.class)
                 .hasMessage("Não é possível cancelar um agendamento já realizado.");
         assertThat(realizado.getStatus()).isEqualTo(StatusAgendamento.REALIZADO);
@@ -320,9 +323,9 @@ class AgendamentoServiceTest {
         outraAgenda.reservar();
         when(repository.buscarComBloqueio(21L))
                 .thenReturn(Optional.of(new Agendamento(outraAgenda, paciente, AGORA)));
-        service.cancelar(21L);
+        service.cancelar(21L, null, RECEPCAO, null);
 
-        assertThatThrownBy(() -> service.cancelar(21L))
+        assertThatThrownBy(() -> service.cancelar(21L, null, RECEPCAO, null))
                 .isInstanceOf(RegraNegocioException.class)
                 .hasMessage("Este agendamento já foi cancelado.");
     }
@@ -331,12 +334,12 @@ class AgendamentoServiceTest {
     void pacienteSoCancelaOProprioAgendamento() {
         Agendamento agendamento = agendamentoExistente();
 
-        assertThatThrownBy(() -> service.cancelarDoPaciente(AGENDAMENTO_ID, 2L))
+        assertThatThrownBy(() -> service.cancelar(AGENDAMENTO_ID, 2L, "ana.souza", null))
                 .isInstanceOf(RegistroNaoEncontradoException.class);
         assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
         assertThat(agenda.getStatus()).isEqualTo(StatusAgenda.AGENDADO);
 
-        service.cancelarDoPaciente(AGENDAMENTO_ID, PACIENTE_ID);
+        service.cancelar(AGENDAMENTO_ID, PACIENTE_ID, "ana.souza", null);
         assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
     }
 
@@ -345,21 +348,142 @@ class AgendamentoServiceTest {
         Agendamento agendamento = agendamentoExistente();
         relogioEm(HORARIO_CONSULTA);
 
-        assertThatThrownBy(() -> service.cancelarDoPaciente(AGENDAMENTO_ID, PACIENTE_ID))
+        assertThatThrownBy(() -> service.cancelar(AGENDAMENTO_ID, PACIENTE_ID, "ana.souza", null))
                 .isInstanceOf(RegraNegocioException.class)
-                .hasMessage("O horário deste agendamento já passou. Fale com a clínica.");
+                .hasMessage("Só é possível cancelar pelo sistema até 24 horas antes do horário. Entre em contato com a clínica.");
         assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
 
         // A equipe pode cancelar depois do horário (ex.: o médico não pôde atender).
-        service.cancelar(AGENDAMENTO_ID);
+        service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, null);
         assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
+    }
+
+    @Test
+    void pacienteCancelaSozinhoSoAte24HorasAntes() {
+        Agendamento agendamento = agendamentoExistente();
+
+        // Exatamente 24 horas antes já está fora do prazo.
+        relogioEm(HORARIO_CONSULTA.minusHours(24));
+        assertThatThrownBy(() -> service.cancelar(AGENDAMENTO_ID, PACIENTE_ID, "ana.souza", null))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessageStartingWith("Só é possível cancelar pelo sistema até 24 horas antes");
+
+        // Um minuto antes do limite, ainda dá.
+        relogioEm(HORARIO_CONSULTA.minusHours(24).minusMinutes(1));
+        service.cancelar(AGENDAMENTO_ID, PACIENTE_ID, "ana.souza", null);
+        assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
+    }
+
+    @Test
+    void cancelamentoGuardaQuemCancelouQuandoEOMotivo() {
+        Agendamento agendamento = agendamentoExistente();
+
+        service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, "  Médico em congresso.  ");
+
+        assertThat(agendamento.getMotivoCancelamento()).isEqualTo("Médico em congresso.");
+        assertThat(agendamento.getCanceladoPor()).isEqualTo(RECEPCAO);
+        assertThat(agendamento.getDataCancelamento()).isEqualTo(AGORA);
+    }
+
+    @Test
+    void motivoEmBrancoFicaVazioEMotivoLongoDemaisERejeitadoSemCancelar() {
+        Agendamento agendamento = agendamentoExistente();
+
+        assertThatThrownBy(() -> service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, "x".repeat(Agendamento.MOTIVO_MAXIMO + 1)))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage("O motivo deve ter no máximo 255 caracteres.");
+        assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+
+        service.cancelar(AGENDAMENTO_ID, null, RECEPCAO, "   ");
+        assertThat(agendamento.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
+        assertThat(agendamento.getMotivoCancelamento()).isNull();
+    }
+
+    // ---------- Reagendamento ----------
+
+    @Test
+    void reagendamentoCancelaOAtualECriaUmNovoComOMesmoPaciente() {
+        Agendamento atual = agendamentoExistente();
+        Agenda nova = novoHorarioDoMesmoMedico(LocalDateTime.of(2030, 1, 13, 14, 0));
+
+        Agendamento novo = service.reagendar(AGENDAMENTO_ID, 30L, null, RECEPCAO);
+
+        assertThat(novo).isNotSameAs(atual);
+        assertThat(novo.getAgenda()).isSameAs(nova);
+        assertThat(novo.getPaciente()).isSameAs(paciente);
+        assertThat(novo.getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+        assertThat(nova.getStatus()).isEqualTo(StatusAgenda.AGENDADO);
+
+        // O antigo fica no histórico, cancelado, dizendo para quando foi remarcado; o horário dele é liberado.
+        assertThat(atual.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
+        assertThat(atual.getMotivoCancelamento()).isEqualTo("Reagendado para 13/01/2030 às 14:00.");
+        assertThat(atual.getCanceladoPor()).isEqualTo(RECEPCAO);
+        assertThat(agenda.getStatus()).isEqualTo(StatusAgenda.DISPONIVEL);
+    }
+
+    @Test
+    void reagendamentoParaHorarioOcupadoOuDeOutroMedicoNaoMudaNada() {
+        Agendamento atual = agendamentoExistente();
+        Agenda ocupada = novoHorarioDoMesmoMedico(LocalDateTime.of(2030, 1, 13, 14, 0));
+        ocupada.reservar();
+
+        assertThatThrownBy(() -> service.reagendar(AGENDAMENTO_ID, 30L, null, RECEPCAO))
+                .isInstanceOf(RegraNegocioException.class).hasMessage(AgendaService.HORARIO_INDISPONIVEL);
+
+        Medico outroMedico = new Medico();
+        outroMedico.setId(9L);
+        when(agendaRepository.buscarComBloqueio(31L))
+                .thenReturn(Optional.of(new Agenda(outroMedico, LocalDate.of(2030, 1, 13), LocalTime.of(15, 0))));
+        assertThatThrownBy(() -> service.reagendar(AGENDAMENTO_ID, 31L, null, RECEPCAO))
+                .isInstanceOf(RegraNegocioException.class).hasMessageStartingWith("O reagendamento deve ser com o mesmo médico.");
+
+        assertThat(atual.getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+        assertThat(agenda.getStatus()).isEqualTo(StatusAgenda.AGENDADO);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void pacienteSoReagendaOProprioAgendamentoEDentroDoPrazo() {
+        Agendamento atual = agendamentoExistente();
+        novoHorarioDoMesmoMedico(LocalDateTime.of(2030, 1, 13, 14, 0));
+
+        assertThatThrownBy(() -> service.reagendar(AGENDAMENTO_ID, 30L, 2L, "carlos.lima"))
+                .isInstanceOf(RegistroNaoEncontradoException.class);
+
+        relogioEm(HORARIO_CONSULTA.minusHours(2));
+        assertThatThrownBy(() -> service.reagendar(AGENDAMENTO_ID, 30L, PACIENTE_ID, "ana.souza"))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessageStartingWith("Só é possível reagendar pelo sistema até 24 horas antes");
+        assertThat(atual.getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+
+        relogioEm(AGORA);
+        service.reagendar(AGENDAMENTO_ID, 30L, PACIENTE_ID, "ana.souza");
+        assertThat(atual.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
+    }
+
+    @Test
+    void naoReagendaAgendamentoComFaltaNemAbreATelaParaEle() {
+        Agendamento agendamento = agendamentoExistente();
+        relogioEm(HORARIO_CONSULTA.plusMinutes(10));
+        service.registrarFalta(AGENDAMENTO_ID);
+
+        assertThatThrownBy(() -> service.reagendar(AGENDAMENTO_ID, 30L, null, RECEPCAO))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage("Não é possível reagendar um agendamento com falta registrada.");
+
+        when(repository.findDetalhadoById(AGENDAMENTO_ID)).thenReturn(Optional.of(agendamento));
+        assertThatThrownBy(() -> service.buscarParaReagendar(AGENDAMENTO_ID, null))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage("Não é possível reagendar um agendamento com falta registrada.");
+        assertThatThrownBy(() -> service.buscarParaReagendar(AGENDAMENTO_ID, 2L))
+                .isInstanceOf(RegistroNaoEncontradoException.class);
     }
 
     @Test
     void agendamentoInexistenteNaoPodeSerCanceladoConfirmadoNemTerFalta() {
         when(repository.buscarComBloqueio(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.cancelar(99L)).isInstanceOf(RegistroNaoEncontradoException.class);
+        assertThatThrownBy(() -> service.cancelar(99L, null, RECEPCAO, null)).isInstanceOf(RegistroNaoEncontradoException.class);
         assertThatThrownBy(() -> service.confirmarPresenca(99L)).isInstanceOf(RegistroNaoEncontradoException.class);
         assertThatThrownBy(() -> service.registrarFalta(99L)).isInstanceOf(RegistroNaoEncontradoException.class);
         assertThatThrownBy(() -> service.confirmarPresenca(null)).isInstanceOf(RegistroNaoEncontradoException.class);
@@ -371,6 +495,13 @@ class AgendamentoServiceTest {
     private void relogioEm(LocalDateTime instante) {
         Clock clock = Clock.fixed(instante.atZone(FUSO).toInstant(), FUSO);
         service = new AgendamentoService(repository, agendaRepository, consultaRepository, pacienteService, clock);
+    }
+
+    /** Outro horário livre, do mesmo médico do horário de teste, encontrado com o id 30. */
+    private Agenda novoHorarioDoMesmoMedico(LocalDateTime dataHora) {
+        Agenda nova = new Agenda(agenda.getMedico(), dataHora.toLocalDate(), dataHora.toLocalTime());
+        when(agendaRepository.buscarComBloqueio(30L)).thenReturn(Optional.of(nova));
+        return nova;
     }
 
     private static Agenda horario(LocalDateTime dataHora) {

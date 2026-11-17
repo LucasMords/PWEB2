@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+
+<!-- Ações de um agendamento, usadas pela listagem e pela agenda do dia. Precisam de "agora"
+     no model. Cada ação só fica habilitada quando cabe no status e no horário: confirmar
+     presença a partir de 1 hora antes, registrar falta depois do horário; o paciente cancela
+     e reagenda até 24 horas antes, a equipe a qualquer momento. O servidor confere tudo de
+     novo, qualquer que seja o estado do botão. -->
+<div th:fragment="acoes(agendamento, descricao)" class="d-flex flex-wrap gap-2"
+     th:with="equipe=${#authorization.expression('hasAnyRole(''ADMIN'',''USER'',''MEDICO'')')},
+              podeAlterar=${equipe ? agendamento.agendado : agendamento.permiteCancelamentoPeloPaciente(agora)}">
+    <button type="button" class="btn btn-sm btn-primary"
+            sec:authorize="hasAnyRole('ADMIN','USER')"
+            data-bs-toggle="modal" data-bs-target="#modalConfirmar"
+            th:data-acao="@{/agendamentos/confirmar/{id}(id=${agendamento.id})}"
+            th:data-descricao="${descricao}"
+            th:disabled="${!agendamento.permiteConfirmarPresenca(agora)}">Confirmar presença</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+            sec:authorize="hasAnyRole('ADMIN','USER')"
+            data-bs-toggle="modal" data-bs-target="#modalFalta"
+            th:data-acao="@{/agendamentos/falta/{id}(id=${agendamento.id})}"
+            th:data-descricao="${descricao}"
+            th:disabled="${!agendamento.permiteRegistrarFalta(agora)}">Registrar falta</button>
+    <a class="btn btn-sm btn-outline-primary"
+       th:href="@{/agendamentos/reagendar/{id}(id=${agendamento.id})}"
+       th:classappend="${!podeAlterar} ? 'disabled'"
+       th:attr="aria-disabled=${!podeAlterar}">Reagendar</a>
+    <button type="button" class="btn btn-sm btn-outline-danger"
+            data-bs-toggle="modal" data-bs-target="#modalCancelar"
+            th:data-acao="@{/agendamentos/cancelar/{id}(id=${agendamento.id})}"
+            th:data-descricao="${descricao}"
+            th:disabled="${!podeAlterar}">Cancelar</button>
+</div>
+
+<!-- Situação do agendamento e, se cancelado, o motivo (e, para a equipe, quem cancelou e quando). -->
+<div th:fragment="situacao(agendamento)">
+    <span th:replace="~{fragments/layout :: statusAgendamento(${agendamento.status})}"></span>
+    <div class="small text-secondary mt-1" th:if="${agendamento.motivoCancelamento != null}"
+         th:text="${agendamento.motivoCancelamento}"></div>
+    <div class="small text-secondary" th:if="${agendamento.dataCancelamento != null}"
+         sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')"
+         th:text="|por ${agendamento.canceladoPor} em ${#temporals.format(agendamento.dataCancelamento, 'dd/MM/yyyy HH:mm')}|"></div>
+</div>
+
+<!-- Modais compartilhados pela página: o confirmacao.js preenche o destino e a descrição.
+     O th:action inclui o token CSRF; o id 0 é só um marcador, trocado ao abrir o modal.
+     Com "origem" (ex.: 'dia'), o servidor volta para a agenda do dia na data informada. -->
+<th:block th:fragment="modais(origem, data)">
+    <div class="modal fade" id="modalCancelar" tabindex="-1" aria-labelledby="modalCancelarTitulo" aria-hidden="true"
+         data-confirmacao>
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" th:action="@{/agendamentos/cancelar/0}">
+                <input type="hidden" name="origem" th:value="${origem}" th:if="${origem != null}">
+                <input type="hidden" name="data" th:value="${data}" th:if="${origem != null}">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="modalCancelarTitulo">Cancelar agendamento</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Cancelar o agendamento de <strong data-descricao></strong>?</p>
+                    <label class="form-label" for="motivoCancelamento">Motivo (opcional)</label>
+                    <textarea class="form-control" id="motivoCancelamento" name="motivo" rows="2" maxlength="255"></textarea>
+                    <p class="form-text mb-0">O horário volta a ficar disponível e o agendamento permanece no histórico.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Cancelar agendamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalConfirmar" tabindex="-1" aria-labelledby="modalConfirmarTitulo" aria-hidden="true"
+         data-confirmacao sec:authorize="hasAnyRole('ADMIN','USER')">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" th:action="@{/agendamentos/confirmar/0}">
+                <input type="hidden" name="origem" th:value="${origem}" th:if="${origem != null}">
+                <input type="hidden" name="data" th:value="${data}" th:if="${origem != null}">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="modalConfirmarTitulo">Confirmar presença</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-1">Confirmar a presença de <strong data-descricao></strong>?</p>
+                    <p class="text-secondary mb-0">A consulta será registrada e o agendamento não poderá mais ser cancelado.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Voltar</button>
+                    <button type="submit" class="btn btn-primary">Confirmar presença</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalFalta" tabindex="-1" aria-labelledby="modalFaltaTitulo" aria-hidden="true"
+         data-confirmacao sec:authorize="hasAnyRole('ADMIN','USER')">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" method="post" th:action="@{/agendamentos/falta/0}">
+                <input type="hidden" name="origem" th:value="${origem}" th:if="${origem != null}">
+                <input type="hidden" name="data" th:value="${data}" th:if="${origem != null}">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="modalFaltaTitulo">Registrar falta</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-1">Registrar que o paciente não compareceu: <strong data-descricao></strong>?</p>
+                    <p class="text-secondary mb-0">Nenhuma consulta é registrada e o agendamento não poderá mais ser alterado.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Voltar</button>
+                    <button type="submit" class="btn btn-secondary">Registrar falta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</th:block>
+
+</body>
+</html>

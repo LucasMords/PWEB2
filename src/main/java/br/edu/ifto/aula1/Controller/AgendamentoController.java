@@ -1,7 +1,9 @@
 package br.edu.ifto.aula1.Controller;
 
+import br.edu.ifto.aula1.Dto.AgendaFiltro;
 import br.edu.ifto.aula1.Dto.AgendamentoFiltro;
 import br.edu.ifto.aula1.Dto.AgendamentoForm;
+import br.edu.ifto.aula1.Model.Entity.Agendamento;
 import br.edu.ifto.aula1.Model.Entity.Paciente;
 import br.edu.ifto.aula1.Model.Entity.StatusAgendamento;
 import br.edu.ifto.aula1.Security.Papeis;
@@ -9,6 +11,7 @@ import br.edu.ifto.aula1.Service.AgendaService;
 import br.edu.ifto.aula1.Service.AgendamentoService;
 import br.edu.ifto.aula1.Service.MedicoService;
 import br.edu.ifto.aula1.Service.PacienteService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,6 +27,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.time.format.DateTimeFormatter;
 
 /**
  * Agendamentos: reserva de um horário, gerenciamento, cancelamento e confirmação de presença.
@@ -96,32 +101,72 @@ public class AgendamentoController {
         return new ModelAndView("agendamento/lista", model);
     }
 
+    /** O motivo é opcional; quem cancelou (login) é registrado junto. */
     @PostMapping("/cancelar/{id}")
-    public ModelAndView cancelar(@PathVariable("id") Long id, Authentication autenticacao,
+    public ModelAndView cancelar(@PathVariable("id") Long id,
+                                 @RequestParam(name = "motivo", required = false) String motivo,
+                                 Authentication autenticacao, HttpServletRequest request,
                                  RedirectAttributes attributes) {
-        if (Papeis.daEquipe(autenticacao))
-            service.cancelar(id);
-        else
-            service.cancelarDoPaciente(id, pacienteAutenticado(autenticacao).getId());
+        service.cancelar(id, pacienteRestrito(autenticacao), autenticacao.getName(), motivo);
 
         attributes.addFlashAttribute("mensagem", "Agendamento cancelado. O horário voltou a ficar disponível.");
-        return new ModelAndView("redirect:" + listaDe(autenticacao));
+        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse(listaDe(autenticacao)));
     }
 
     /** Só administração e recepção chegam aqui (SecurityConfiguration). */
     @PostMapping("/confirmar/{id}")
-    public ModelAndView confirmar(@PathVariable("id") Long id, RedirectAttributes attributes) {
+    public ModelAndView confirmar(@PathVariable("id") Long id, HttpServletRequest request,
+                                  RedirectAttributes attributes) {
         service.confirmarPresenca(id);
         attributes.addFlashAttribute("mensagem", "Presença confirmada. A consulta foi registrada.");
-        return new ModelAndView("redirect:/agendamentos/list");
+        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse("/agendamentos/list"));
     }
 
     /** O paciente não compareceu. Também só administração e recepção (SecurityConfiguration). */
     @PostMapping("/falta/{id}")
-    public ModelAndView registrarFalta(@PathVariable("id") Long id, RedirectAttributes attributes) {
+    public ModelAndView registrarFalta(@PathVariable("id") Long id, HttpServletRequest request,
+                                       RedirectAttributes attributes) {
         service.registrarFalta(id);
         attributes.addFlashAttribute("mensagem", "Falta registrada.");
-        return new ModelAndView("redirect:/agendamentos/list");
+        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse("/agendamentos/list"));
+    }
+
+    /**
+     * Tela de reagendamento: o agendamento atual e os horários livres do mesmo médico.
+     * O paciente só chega aqui com o próprio agendamento e dentro do prazo.
+     */
+    @GetMapping("/reagendar/{id}")
+    public ModelAndView reagendar(@PathVariable("id") Long id,
+                                  @ModelAttribute("filtro") AgendaFiltro filtro, BindingResult result,
+                                  @RequestParam(name = "page", defaultValue = "0") int page,
+                                  Authentication autenticacao, ModelMap model) {
+        Agendamento agendamento = service.buscarParaReagendar(id, pacienteRestrito(autenticacao));
+
+        // Só horários do mesmo médico: trocar de médico é cancelar e agendar de novo.
+        filtro.setMedicoId(agendamento.getAgenda().getMedico().getId());
+        filtro.setEspecialidade(null);
+
+        model.addAttribute("agendamento", agendamento);
+        model.addAttribute("voltar", listaDe(autenticacao));
+        model.addAttribute("pagina", agendaService.listarDisponiveis(filtro, PageRequest.of(Math.max(page, 0), TAMANHO_PAGINA)));
+        return new ModelAndView("agendamento/reagendar", model);
+    }
+
+    @PostMapping("/reagendar/{id}")
+    public ModelAndView confirmarReagendamento(@PathVariable("id") Long id,
+                                               @RequestParam(name = "agendaId", required = false) Long agendaId,
+                                               Authentication autenticacao, RedirectAttributes attributes) {
+        Agendamento novo = service.reagendar(id, agendaId, pacienteRestrito(autenticacao), autenticacao.getName());
+
+        attributes.addFlashAttribute("mensagem", "Agendamento remarcado para "
+                + novo.getAgenda().getData().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + " às " + novo.getAgenda().getHorario().format(DateTimeFormatter.ofPattern("HH:mm")) + ".");
+        return new ModelAndView("redirect:" + listaDe(autenticacao));
+    }
+
+    /** null para a equipe (age em nome de qualquer paciente); o id do paciente da conta, para o paciente. */
+    private Long pacienteRestrito(Authentication autenticacao) {
+        return Papeis.daEquipe(autenticacao) ? null : pacienteAutenticado(autenticacao).getId();
     }
 
     private ModelAndView confirmacao(Long agendaId, Authentication autenticacao, ModelMap model) {
