@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('Médicos')}"></head>
 <body>
 
@@ -8,10 +8,12 @@
 <main class="container">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h1 class="h3 mb-0">Médicos</h1>
-        <a class="btn btn-primary" th:href="@{/medicos/form}">Novo médico</a>
+        <!-- Esconder o botão é só comodidade: quem protege a URL é a SecurityConfiguration. -->
+        <a class="btn btn-primary" th:href="@{/medicos/form}" sec:authorize="hasRole('ADMIN')">Novo médico</a>
     </div>
 
     <div th:replace="~{fragments/layout :: mensagem}"></div>
+    <div th:replace="~{fragments/layout :: erro}"></div>
 
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
@@ -35,11 +37,14 @@
                         <div class="d-flex gap-2">
                             <a class="btn btn-sm btn-primary"
                                th:href="@{/medicos/consultas/{id}(id=${medico.id})}">Consultas</a>
-                            <a class="btn btn-sm btn-outline-secondary"
+                            <a class="btn btn-sm btn-outline-secondary" sec:authorize="hasRole('ADMIN')"
                                th:href="@{/medicos/edit/{id}(id=${medico.id})}">Editar</a>
-                            <a class="btn btn-sm btn-outline-danger"
-                               th:href="@{/medicos/remove/{id}(id=${medico.id})}"
-                               onclick="return confirm('Excluir este médico e suas consultas?')">Excluir</a>
+                            <!-- Exclusão por POST: o th:action inclui o token CSRF -->
+                            <form class="m-0" method="post" sec:authorize="hasRole('ADMIN')"
+                                  th:action="@{/medicos/remove/{id}(id=${medico.id})}"
+                                  onsubmit="return confirm('Excluir este médico?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Excluir</button>
+                            </form>
                         </div>
                     </td>
                 </tr>

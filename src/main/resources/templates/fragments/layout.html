@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 
 <!-- <head> comum: Bootstrap 5.3 + ajustes de cor da clínica -->
 <head th:fragment="head(titulo)">
@@ -14,12 +14,25 @@
 
 <!-- Barra de navegação comum a todas as páginas -->
 <nav th:fragment="navbar" class="navbar navbar-expand navbar-clinica mb-4" data-bs-theme="dark">
+    <div class="container justify-content-end gap-3 text-white">
+        <span sec:authorize="isAuthenticated()">Olá,
+            <a class="link-light fw-bold" th:href="@{/usuario/dados}" sec:authentication="name">usuário</a></span>
+        <a class="btn btn-sm btn-outline-light" th:href="@{/login}" sec:authorize="!isAuthenticated()">Entrar</a>
+        <form th:action="@{/logout}" method="post" class="m-0" sec:authorize="isAuthenticated()">
+            <button type="submit" class="btn btn-sm btn-outline-light">Sair</button>
+        </form>
+    </div>
     <div class="container">
         <a class="navbar-brand fw-bold" th:href="@{/}">Clínica IFTO</a>
-        <div class="navbar-nav">
-            <a class="nav-link" th:href="@{/pacientes/list}">Pacientes</a>
-            <a class="nav-link" th:href="@{/medicos/list}">Médicos</a>
-            <a class="nav-link" th:href="@{/consultas/list}">Consultas</a>
+        <div class="navbar-nav flex-wrap">
+            <!-- Cadastros e gerenciamento: só a equipe. O paciente e o médico veem o que é deles. -->
+            <a class="nav-link" th:href="@{/pacientes/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Pacientes</a>
+            <a class="nav-link" th:href="@{/medicos/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Médicos</a>
+            <a class="nav-link" th:href="@{/agenda/list}" sec:authorize="isAuthenticated()">Horários disponíveis</a>
+            <a class="nav-link" th:href="@{/agendamentos/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Agendamentos</a>
+            <a class="nav-link" th:href="@{/consultas/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Consultas</a>
+            <a class="nav-link" th:href="@{/usuario/agendamentos}" sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Meus agendamentos</a>
+            <a class="nav-link" th:href="@{/usuario/consultas}" sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Minhas consultas</a>
         </div>
     </div>
 </nav>
@@ -28,10 +41,51 @@
 <div th:fragment="mensagem" th:if="${mensagem}" class="alert alert-success" role="alert"
      th:text="${mensagem}"></div>
 
-<!-- Resumo de erros: deve ser incluído dentro de um <form th:object> -->
-<div th:fragment="erros" th:if="${#fields.hasAnyErrors()}" class="alert alert-danger" role="alert">
+<!-- Mensagem de regra de negócio violada, enviada como flash pelo RegraNegocioAdvice -->
+<div th:fragment="erro" th:if="${erro}" class="alert alert-danger" role="alert"
+     th:text="${erro}"></div>
+
+<!-- Selo colorido com a situação de um agendamento -->
+<span th:fragment="statusAgendamento(status)" class="badge"
+      th:classappend="${status.name() == 'REALIZADO'} ? 'text-bg-success'
+                    : (${status.name() == 'CANCELADO'} ? 'text-bg-danger' : 'text-bg-warning')"
+      th:text="${status.descricao}"></span>
+
+<!-- JavaScript do Bootstrap (modais) e o script que prepara os modais de confirmação.
+     Incluído no fim do <body> das páginas que usam modal. -->
+<th:block th:fragment="scripts">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:src="@{/js/confirmacao.js}"></script>
+</th:block>
+
+<!-- Resumo de erros: deve ser incluído dentro de um <form th:object>.
+     Considera também os erros de "credenciais", quando o formulário tem dados de acesso. -->
+<div th:fragment="erros" class="alert alert-danger" role="alert"
+     th:if="${#fields.hasAnyErrors() or (credenciais != null and #fields.hasErrors('${credenciais.*}'))}">
     <strong>Não foi possível salvar.</strong> Corrija os campos destacados abaixo.
 </div>
+
+<!-- Dados de acesso dos cadastros de paciente e de médico (objeto "credenciais" do model).
+     A senha nunca volta preenchida: em caso de erro, é digitada de novo. -->
+<fieldset th:fragment="credenciais" class="border-top pt-3 mb-3">
+    <legend class="h6">Dados de acesso</legend>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label" for="login">Usuário</label>
+            <input type="text" class="form-control" th:field="${credenciais.login}" th:errorclass="is-invalid"
+                   autocomplete="username" autocapitalize="none">
+            <div class="invalid-feedback" th:errors="${credenciais.login}"></div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label class="form-label" for="senha">Senha</label>
+            <input type="password" class="form-control" th:field="${credenciais.senha}" th:errorclass="is-invalid"
+                   autocomplete="new-password">
+            <div class="invalid-feedback" th:errors="${credenciais.senha}"></div>
+            <div class="form-text">Mínimo de 8 caracteres.</div>
+        </div>
+    </div>
+</fieldset>
 
 </body>
 </html>

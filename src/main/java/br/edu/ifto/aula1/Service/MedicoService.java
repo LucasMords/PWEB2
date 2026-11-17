@@ -1,21 +1,30 @@
 package br.edu.ifto.aula1.Service;
 
 import br.edu.ifto.aula1.Model.Entity.Medico;
+import br.edu.ifto.aula1.Model.Entity.Perfil;
+import br.edu.ifto.aula1.Model.repository.AgendaRepository;
 import br.edu.ifto.aula1.Model.repository.MedicoRepository;
+import br.edu.ifto.aula1.Validation.Credenciais;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
 public class MedicoService {
 
     private final MedicoRepository repository;
+    private final UsuarioService usuarioService;
+    private final AgendaRepository agendaRepository;
 
-    public MedicoService(MedicoRepository repository) {
+    public MedicoService(MedicoRepository repository, UsuarioService usuarioService,
+                         AgendaRepository agendaRepository) {
         this.repository = repository;
+        this.usuarioService = usuarioService;
+        this.agendaRepository = agendaRepository;
     }
 
     public List<Medico> listar() {
@@ -44,9 +53,19 @@ public class MedicoService {
                 : repository.existsByCrmAndIdNot(crm, idMedicoAtual);
     }
 
+    /** Médico dono da conta de acesso com este login, se houver. */
+    public Optional<Medico> buscarPorLogin(String login) {
+        return repository.findByUsuarioLogin(login);
+    }
+
+    /**
+     * Cadastra o médico junto com a conta institucional dele, na mesma transação:
+     * se um dos dois falhar, nenhum é gravado. O papel inicial é MEDICO.
+     */
     @Transactional
-    public Medico cadastrar(Medico medico) {
+    public Medico cadastrar(Medico medico, Credenciais credenciais) {
         medico.setId(null);
+        medico.vincularUsuario(usuarioService.criar(credenciais, Perfil.MEDICO));
         return repository.save(medico);
     }
 
@@ -67,9 +86,21 @@ public class MedicoService {
         return medico;
     }
 
-    /** Remove o médico e, pelo cascade da entidade, as consultas dele. */
+    /**
+     * Remove o médico e, pelo cascade da entidade, a conta de acesso dele. Um médico com
+     * horários na agenda não é removido: isso apagaria o histórico de agendamentos e consultas.
+     */
     @Transactional
     public void remover(Long id) {
-        repository.delete(buscar(id));
+        Medico medico = buscar(id);
+        if (agendaRepository.existsByMedicoId(id))
+            throw new RegraNegocioException("Não é possível excluir um médico que tem horários na agenda.");
+
+        repository.delete(medico);
+    }
+
+    /** Especialidades dos médicos cadastrados, em ordem alfabética. */
+    public List<String> listarEspecialidades() {
+        return repository.buscarEspecialidades();
     }
 }

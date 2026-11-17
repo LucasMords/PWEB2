@@ -1,8 +1,12 @@
 package br.edu.ifto.aula1.Controller;
 
 import br.edu.ifto.aula1.Model.Entity.Paciente;
+import br.edu.ifto.aula1.Model.Entity.Perfil;
 import br.edu.ifto.aula1.Service.ConsultaService;
 import br.edu.ifto.aula1.Service.PacienteService;
+import br.edu.ifto.aula1.Validation.Credenciais;
+import br.edu.ifto.aula1.Validation.CredenciaisValidator;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -20,15 +24,20 @@ public class PacienteController {
 
     private final PacienteService service;
     private final ConsultaService consultaService;
+    private final CredenciaisValidator credenciaisValidator;
 
-    public PacienteController(PacienteService service, ConsultaService consultaService) {
+    public PacienteController(PacienteService service, ConsultaService consultaService,
+                              CredenciaisValidator credenciaisValidator) {
         this.service = service;
         this.consultaService = consultaService;
+        this.credenciaisValidator = credenciaisValidator;
     }
 
+    // Formulário público: é por ele que o paciente cria o próprio cadastro e a conta de acesso.
     @GetMapping("/form")
     public ModelAndView form(ModelMap model) {
         model.addAttribute("paciente", new Paciente());
+        model.addAttribute("credenciais", new Credenciais());
         return new ModelAndView("paciente/formulario", model);
     }
 
@@ -39,13 +48,23 @@ public class PacienteController {
     }
 
     @PostMapping("/save")
-    public ModelAndView save(@Valid Paciente paciente, BindingResult result, RedirectAttributes attributes) {
+    public ModelAndView save(@Valid Paciente paciente, BindingResult result,
+                             @Valid Credenciais credenciais, BindingResult resultCredenciais,
+                             HttpServletRequest request, RedirectAttributes attributes) {
         paciente.setId(null); // cadastro nunca usa id vindo da requisição (nem na checagem de CPF duplicado)
         validarCpfUnico(paciente, result);
-        if (result.hasErrors())
+        credenciaisValidator.validate(credenciais, resultCredenciais);
+        if (result.hasErrors() || resultCredenciais.hasErrors())
             return new ModelAndView("paciente/formulario");
 
-        service.cadastrar(paciente);
+        service.cadastrar(paciente, credenciais);
+
+        // Quem se cadastrou sozinho segue para o login; a equipe volta para a lista de pacientes.
+        if (request.getUserPrincipal() == null || request.isUserInRole(Perfil.PACIENTE)) {
+            attributes.addFlashAttribute("mensagem", "Cadastro realizado. Entre com o usuário e a senha que você escolheu.");
+            return new ModelAndView("redirect:/login");
+        }
+
         attributes.addFlashAttribute("mensagem", "Paciente cadastrado com sucesso.");
         return new ModelAndView("redirect:/pacientes/list");
     }
@@ -67,7 +86,7 @@ public class PacienteController {
         return new ModelAndView("redirect:/pacientes/list");
     }
 
-    @GetMapping("/remove/{id}")
+    @PostMapping("/remove/{id}")
     public ModelAndView remove(@PathVariable("id") Long id) {
         service.remover(id);
         return new ModelAndView("redirect:/pacientes/list");

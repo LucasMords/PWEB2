@@ -55,6 +55,11 @@
                     </div>
                 </div>
 
+                <!-- A conta institucional é criada junto com o médico; na edição ela não é alterada. -->
+                <th:block th:if="${medico.id == null}">
+                    <fieldset th:replace="~{fragments/layout :: credenciais}"></fieldset>
+                </th:block>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Salvar</button>
                     <a class="btn btn-outline-secondary" th:href="@{/medicos/list}">Cancelar</a>

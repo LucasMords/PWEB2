@@ -3,6 +3,8 @@ package br.edu.ifto.aula1.Controller;
 import br.edu.ifto.aula1.Model.Entity.Medico;
 import br.edu.ifto.aula1.Service.ConsultaService;
 import br.edu.ifto.aula1.Service.MedicoService;
+import br.edu.ifto.aula1.Validation.Credenciais;
+import br.edu.ifto.aula1.Validation.CredenciaisValidator;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -20,15 +22,20 @@ public class MedicoController {
 
     private final MedicoService service;
     private final ConsultaService consultaService;
+    private final CredenciaisValidator credenciaisValidator;
 
-    public MedicoController(MedicoService service, ConsultaService consultaService) {
+    public MedicoController(MedicoService service, ConsultaService consultaService,
+                            CredenciaisValidator credenciaisValidator) {
         this.service = service;
         this.consultaService = consultaService;
+        this.credenciaisValidator = credenciaisValidator;
     }
 
+    // Só o ADMIN chega aqui: é ele quem cria o médico e a conta institucional dele.
     @GetMapping("/form")
     public ModelAndView form(ModelMap model) {
         model.addAttribute("medico", new Medico());
+        model.addAttribute("credenciais", new Credenciais());
         return new ModelAndView("medico/formulario", model);
     }
 
@@ -39,13 +46,16 @@ public class MedicoController {
     }
 
     @PostMapping("/save")
-    public ModelAndView save(@Valid Medico medico, BindingResult result, RedirectAttributes attributes) {
+    public ModelAndView save(@Valid Medico medico, BindingResult result,
+                             @Valid Credenciais credenciais, BindingResult resultCredenciais,
+                             RedirectAttributes attributes) {
         medico.setId(null); // cadastro nunca usa id vindo da requisição (nem na checagem de CRM duplicado)
         validarCrmUnico(medico, result);
-        if (result.hasErrors())
+        credenciaisValidator.validate(credenciais, resultCredenciais);
+        if (result.hasErrors() || resultCredenciais.hasErrors())
             return new ModelAndView("medico/formulario");
 
-        service.cadastrar(medico);
+        service.cadastrar(medico, credenciais);
         attributes.addFlashAttribute("mensagem", "Médico cadastrado com sucesso.");
         return new ModelAndView("redirect:/medicos/list");
     }
@@ -67,7 +77,7 @@ public class MedicoController {
         return new ModelAndView("redirect:/medicos/list");
     }
 
-    @GetMapping("/remove/{id}")
+    @PostMapping("/remove/{id}")
     public ModelAndView remove(@PathVariable("id") Long id) {
         service.remover(id);
         return new ModelAndView("redirect:/medicos/list");

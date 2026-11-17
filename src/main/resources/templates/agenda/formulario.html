@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Cadastrar horário')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container">
+    <div class="row">
+        <div class="col-lg-8">
+            <h1 class="h3 mb-1">Cadastrar horário</h1>
+            <p class="text-secondary">O horário fica disponível para agendamento assim que é cadastrado.</p>
+
+            <div th:replace="~{fragments/layout :: mensagem}"></div>
+
+            <!-- novalidate: o navegador não valida nada; quem valida é o back-end -->
+            <form class="card card-body border-0 shadow-sm"
+                  th:action="@{/agenda/save}"
+                  th:object="${form}"
+                  method="post"
+                  novalidate>
+
+                <div th:replace="~{fragments/layout :: erros}"></div>
+                <div class="alert alert-danger" role="alert" th:each="erroGlobal : ${#fields.globalErrors()}"
+                     th:text="${erroGlobal}"></div>
+
+                <!-- Administração e recepção escolhem o médico -->
+                <div class="mb-3" th:if="${medicoAutenticado == null}">
+                    <label class="form-label" for="medicoId">Médico</label>
+                    <select class="form-select" th:field="*{medicoId}" th:errorclass="is-invalid">
+                        <option value="">Selecione</option>
+                        <option th:each="medico : ${medicos}"
+                                th:value="${medico.id}"
+                                th:text="${medico.nome + ' - ' + medico.especialidade}">
+                        </option>
+                    </select>
+                    <div class="invalid-feedback" th:errors="*{medicoId}"></div>
+                </div>
+
+                <!-- O médico cadastra apenas a própria agenda: o servidor usa a conta autenticada -->
+                <div class="mb-3" th:if="${medicoAutenticado != null}">
+                    <label class="form-label" for="medicoNome">Médico</label>
+                    <input type="text" class="form-control" id="medicoNome" readonly disabled
+                           th:value="${medicoAutenticado.nome + ' - ' + medicoAutenticado.especialidade}">
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="data">Data</label>
+                        <input type="date" class="form-control" th:field="*{data}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{data}"></div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="horario">Horário</label>
+                        <input type="time" class="form-control" th:field="*{horario}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{horario}"></div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Cadastrar disponibilidade</button>
+                    <a class="btn btn-outline-secondary" th:href="@{/agenda/list}">Ver horários disponíveis</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

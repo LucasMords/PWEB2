@@ -1,13 +1,13 @@
 package br.edu.ifto.aula1.Model.Entity;
 
-public enum StatusConsulta {
-    AGENDADA("Agendada"),
-    REALIZADA("Realizada"),
-    CANCELADA("Cancelada");
+/** Situação de um horário da agenda do médico. */
+public enum StatusAgenda {
+    DISPONIVEL("Disponível"),
+    AGENDADO("Agendado");
 
     private final String descricao;
 
-    StatusConsulta(String descricao) {
+    StatusAgenda(String descricao) {
         this.descricao = descricao;
     }
 

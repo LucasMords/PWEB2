@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('Consultas')}"></head>
 <body>
 
@@ -8,10 +8,13 @@
 <main class="container">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h1 class="h3 mb-0" th:text="${titulo}">Consultas</h1>
-        <a class="btn btn-primary" th:href="@{/consultas/form}">Nova consulta</a>
+        <!-- A consulta nasce da confirmação de presença, feita na tela de agendamentos. -->
+        <a class="btn btn-outline-secondary" th:href="@{/agendamentos/list}"
+           sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Ver agendamentos</a>
     </div>
 
     <div th:replace="~{fragments/layout :: mensagem}"></div>
+    <div th:replace="~{fragments/layout :: erro}"></div>
 
     <div class="alert alert-light border" th:if="${#lists.isEmpty(consultas)}">
         Nenhuma consulta encontrada.
@@ -22,34 +25,28 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                 <tr>
-                    <th>Data e hora</th>
+                    <th>Realizada em</th>
                     <th>Paciente</th>
                     <th>Médico</th>
-                    <th>Status</th>
+                    <th>Agendamento</th>
                     <th>Observações</th>
-                    <th>Ações</th>
+                    <th sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Ações</th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr th:each="consulta : ${consultas}">
-                    <td th:text="${#temporals.format(consulta.dataHora, 'dd/MM/yyyy HH:mm')}"></td>
+                    <td th:text="${#temporals.format(consulta.dataRealizacao, 'dd/MM/yyyy HH:mm')}"></td>
                     <td th:text="${consulta.paciente.nome}"></td>
                     <td th:text="${consulta.medico.nome}"></td>
                     <td>
-                        <span class="badge"
-                              th:classappend="${consulta.status.name() == 'REALIZADA'} ? 'text-bg-success'
-                                            : (${consulta.status.name() == 'CANCELADA'} ? 'text-bg-danger' : 'text-bg-secondary')"
-                              th:text="${consulta.status.descricao}"></span>
+                        <span th:text="|Nº ${consulta.agendamento.id}|"></span>
+                        <span class="text-secondary small d-block"
+                              th:text="|Horário marcado: ${#temporals.format(consulta.agendamento.agenda.dataHora, 'dd/MM/yyyy HH:mm')}|"></span>
                     </td>
                     <td th:text="${consulta.observacoes}"></td>
-                    <td>
-                        <div class="d-flex gap-2">
-                            <a class="btn btn-sm btn-outline-secondary"
-                               th:href="@{/consultas/edit/{id}(id=${consulta.id})}">Editar</a>
-                            <a class="btn btn-sm btn-outline-danger"
-                               th:href="@{/consultas/remove/{id}(id=${consulta.id})}"
-                               onclick="return confirm('Excluir esta consulta?')">Excluir</a>
-                        </div>
+                    <td sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">
+                        <a class="btn btn-sm btn-outline-secondary"
+                           th:href="@{/consultas/edit/{id}(id=${consulta.id})}">Observações</a>
                     </td>
                 </tr>
                 </tbody>

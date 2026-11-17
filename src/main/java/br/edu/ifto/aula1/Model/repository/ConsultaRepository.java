@@ -5,18 +5,26 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
 
-    // paciente e medico são LAZY e o open-in-view está desligado: o @EntityGraph os carrega
-    // na mesma consulta para que a listagem consiga exibir os nomes.
+    // Paciente e médico vêm pelo agendamento. Tudo é LAZY e o open-in-view está desligado:
+    // o @EntityGraph carrega o caminho inteiro na mesma consulta para a tela exibir os nomes.
 
-    @EntityGraph(attributePaths = {"paciente", "medico"})
-    List<Consulta> findAllByOrderByDataHoraDesc();
+    @EntityGraph(attributePaths = {"agendamento.paciente", "agendamento.agenda.medico"})
+    List<Consulta> findAllByOrderByDataRealizacaoDesc();
 
-    @EntityGraph(attributePaths = {"paciente", "medico"})
-    List<Consulta> findByPacienteIdOrderByDataHoraDesc(Long pacienteId);
+    @EntityGraph(attributePaths = {"agendamento.paciente", "agendamento.agenda.medico"})
+    List<Consulta> findByAgendamentoPacienteIdOrderByDataRealizacaoDesc(Long pacienteId);
 
-    @EntityGraph(attributePaths = {"paciente", "medico"})
-    List<Consulta> findByMedicoIdOrderByDataHoraDesc(Long medicoId);
+    @EntityGraph(attributePaths = {"agendamento.paciente", "agendamento.agenda.medico"})
+    List<Consulta> findByAgendamentoAgendaMedicoIdOrderByDataRealizacaoDesc(Long medicoId);
+
+    @EntityGraph(attributePaths = {"agendamento.paciente", "agendamento.agenda.medico"})
+    Optional<Consulta> findDetalhadaById(Long id);
+
+    boolean existsByAgendamentoId(Long agendamentoId);
+
+    Optional<Consulta> findByAgendamentoId(Long agendamentoId);
 }

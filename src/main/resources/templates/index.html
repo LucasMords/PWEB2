@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('Início')}"></head>
 <body>
 
@@ -7,12 +7,26 @@
 
 <main class="container">
     <h1 class="h3">Sistema de consultas</h1>
-    <p class="text-secondary">Cadastre pacientes e médicos e gerencie a agenda de consultas.</p>
+    <p class="text-secondary" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">
+        Cadastre pacientes e médicos e gerencie a agenda, os agendamentos e as consultas.</p>
+    <p class="text-secondary" sec:authorize="!hasAnyRole('ADMIN','USER','MEDICO')">
+        Agende um horário e acompanhe aqui as suas consultas na clínica.</p>
+
+    <div th:replace="~{fragments/layout :: erro}"></div>
 
     <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-primary" th:href="@{/consultas/form}">Agendar consulta</a>
-        <a class="btn btn-outline-secondary" th:href="@{/pacientes/form}">Novo paciente</a>
-        <a class="btn btn-outline-secondary" th:href="@{/medicos/form}">Novo médico</a>
+        <a class="btn btn-primary" th:href="@{/agenda/list}">Agendar horário</a>
+        <a class="btn btn-outline-secondary" th:href="@{/agenda/form}"
+           sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Cadastrar horário</a>
+        <a class="btn btn-outline-secondary" th:href="@{/agendamentos/list}"
+           sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Agendamentos</a>
+        <a class="btn btn-outline-secondary" th:href="@{/pacientes/form}"
+           sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Novo paciente</a>
+        <a class="btn btn-outline-secondary" th:href="@{/medicos/form}" sec:authorize="hasRole('ADMIN')">Novo médico</a>
+        <a class="btn btn-outline-secondary" th:href="@{/usuario/agendamentos}"
+           sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Meus agendamentos</a>
+        <a class="btn btn-outline-secondary" th:href="@{/usuario/consultas}"
+           sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Minhas consultas</a>
     </div>
 </main>
 

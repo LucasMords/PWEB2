@@ -3,15 +3,15 @@ package br.edu.ifto.aula1;
 import br.edu.ifto.aula1.Model.Entity.Consulta;
 import br.edu.ifto.aula1.Model.Entity.Medico;
 import br.edu.ifto.aula1.Model.Entity.Paciente;
-import br.edu.ifto.aula1.Model.Entity.StatusConsulta;
+import br.edu.ifto.aula1.Model.Entity.StatusAgendamento;
+import br.edu.ifto.aula1.Model.repository.AgendaRepository;
+import br.edu.ifto.aula1.Model.repository.AgendamentoRepository;
 import br.edu.ifto.aula1.Model.repository.ConsultaRepository;
 import br.edu.ifto.aula1.Model.repository.MedicoRepository;
 import br.edu.ifto.aula1.Model.repository.PacienteRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
-import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,28 +24,38 @@ class Aula1ApplicationTests {
     private MedicoRepository medicos;
 
     @Autowired
+    private AgendaRepository agendas;
+
+    @Autowired
+    private AgendamentoRepository agendamentos;
+
+    @Autowired
     private ConsultaRepository consultas;
 
     @Test
     void contextLoadsEImportaDadosIniciais() {
         assertThat(pacientes.count()).isGreaterThanOrEqualTo(3);
         assertThat(medicos.count()).isGreaterThanOrEqualTo(2);
+        assertThat(agendas.count()).isGreaterThanOrEqualTo(9);
+        assertThat(agendamentos.count()).isGreaterThanOrEqualTo(5);
         assertThat(consultas.count()).isGreaterThanOrEqualTo(3);
     }
 
     @Test
-    void consultaDeveEstarAssociadaAoPacienteEAoMedico() {
-        Paciente paciente = pacientes.findAll().getFirst();
-        Medico medico = medicos.findAll().getFirst();
-        Consulta consulta = new Consulta();
-        consulta.setDataHora(LocalDateTime.of(2026, 10, 1, 8, 30));
-        consulta.setStatus(StatusConsulta.AGENDADA);
-        consulta.setPaciente(paciente);
-        consulta.setMedico(medico);
-        Consulta salva = consultas.saveAndFlush(consulta);
-        assertThat(consultas.findByPacienteIdOrderByDataHoraDesc(paciente.getId()))
-                .extracting(Consulta::getId).contains(salva.getId());
-        assertThat(consultas.findByMedicoIdOrderByDataHoraDesc(medico.getId()))
-                .extracting(Consulta::getId).contains(salva.getId());
+    void consultaChegaAoPacienteEAoMedicoPeloAgendamento() {
+        Paciente ana = pacientes.findByUsuarioLogin("ana.souza").orElseThrow();
+        Medico eduardo = medicos.findByUsuarioLogin("eduardo.melo").orElseThrow();
+
+        // Consulta do import.sql: Ana com o Dr. Eduardo. O @EntityGraph traz o caminho inteiro,
+        // então os nomes podem ser lidos fora de uma transação.
+        Consulta consulta = consultas.findByAgendamentoPacienteIdOrderByDataRealizacaoDesc(ana.getId()).stream()
+                .filter(c -> "Consulta de rotina.".equals(c.getObservacoes()))
+                .findFirst().orElseThrow();
+
+        assertThat(consulta.getPaciente().getNome()).isEqualTo("Ana Souza");
+        assertThat(consulta.getMedico().getNome()).isEqualTo("Dr. Eduardo Melo");
+        assertThat(consulta.getAgendamento().getStatus()).isEqualTo(StatusAgendamento.REALIZADO);
+        assertThat(consultas.findByAgendamentoAgendaMedicoIdOrderByDataRealizacaoDesc(eduardo.getId()))
+                .extracting(Consulta::getId).contains(consulta.getId());
     }
 }

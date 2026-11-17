@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Entrar')}"></head>
+<body>
+
+<main class="login-layout">
+
+    <!-- Painel da marca -->
+    <section class="login-marca">
+        <div class="login-marca-conteudo">
+            <svg class="login-logo" viewBox="0 0 64 64" aria-hidden="true">
+                <rect width="64" height="64" rx="16" fill="#ffffff" fill-opacity="0.16"/>
+                <path d="M27 14h10v13h13v10H37v13H27V37H14V27h13z" fill="#ffffff"/>
+            </svg>
+
+            <h1 class="login-titulo">Clínica IFTO</h1>
+            <p class="login-subtitulo">Pacientes, médicos e a agenda de consultas em um só lugar.</p>
+
+            <ul class="login-destaques">
+                <li>Agendamento e acompanhamento de consultas</li>
+                <li>Cadastro de pacientes e médicos</li>
+                <li>Acesso por perfil: pacientes, médicos, recepção e administração</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Painel do formulário -->
+    <section class="login-painel">
+        <div class="login-cartao">
+            <h2 class="h3 mb-1">Entrar</h2>
+            <p class="text-secondary mb-4">Informe seu usuário e sua senha para acessar o sistema.</p>
+
+            <!-- O Spring Security redireciona para /login?error e /login?logout -->
+            <div class="alert alert-danger" role="alert" th:if="${param.error}">
+                Usuário ou senha inválidos.
+            </div>
+            <div class="alert alert-success" role="alert" th:if="${param.logout}">
+                Você saiu do sistema.
+            </div>
+            <!-- Mensagem enviada pelo cadastro de paciente (flash) -->
+            <div th:replace="~{fragments/layout :: mensagem}"></div>
+
+            <!-- th:action inclui o token CSRF; os campos precisam se chamar username e password -->
+            <form th:action="@{/login}" method="post" novalidate>
+                <div class="form-floating mb-3">
+                    <input type="text" class="form-control" id="username" name="username"
+                           placeholder="Usuário" autocomplete="username" autofocus>
+                    <label for="username">Usuário</label>
+                </div>
+
+                <div class="form-floating mb-3">
+                    <input type="password" class="form-control" id="password" name="password"
+                           placeholder="Senha" autocomplete="current-password">
+                    <label for="password">Senha</label>
+                </div>
+
+                <div class="form-check mb-4">
+                    <input type="checkbox" class="form-check-input" id="remember-me" name="remember-me">
+                    <label class="form-check-label" for="remember-me">Lembrar de mim neste navegador</label>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-100">Entrar</button>
+            </form>
+
+            <p class="text-center text-secondary mt-4 mb-0">
+                É paciente e ainda não tem conta?
+                <a th:href="@{/pacientes/form}">Cadastre-se</a>
+            </p>
+        </div>
+    </section>
+
+</main>
+
+</body>
+</html>

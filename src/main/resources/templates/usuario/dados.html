@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Meus dados')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container">
+    <h1 class="h3 mb-3">Meus dados</h1>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Login</dt>
+                <dd class="col-sm-9" th:text="${usuario.login}"></dd>
+
+                <!-- A pessoa a quem a conta pertence; admin e recepção não têm vínculo. -->
+                <th:block th:if="${paciente != null}">
+                    <dt class="col-sm-3">Paciente</dt>
+                    <dd class="col-sm-9" th:text="${paciente.nome}"></dd>
+                </th:block>
+                <th:block th:if="${medico != null}">
+                    <dt class="col-sm-3">Médico</dt>
+                    <dd class="col-sm-9" th:text="|${medico.nome} (${medico.crm})|"></dd>
+                </th:block>
+
+                <dt class="col-sm-3">Situação</dt>
+                <dd class="col-sm-9" th:text="${usuario.ativo} ? 'Ativo' : 'Inativo'"></dd>
+
+                <dt class="col-sm-3">Perfis</dt>
+                <dd class="col-sm-9 mb-0">
+                    <span class="badge text-bg-secondary me-1" th:each="perfil : ${usuario.perfis}"
+                          th:text="${perfil.nome}"></span>
+                </dd>
+            </dl>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

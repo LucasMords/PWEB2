@@ -3,16 +3,15 @@ package br.edu.ifto.aula1.Model.Entity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.*;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 @Entity
@@ -50,9 +49,16 @@ public class Medico {
     @Column(length = 120)
     private String email;
 
-    @OneToMany(mappedBy = "medico", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("dataHora DESC")
-    private List<Consulta> consultas = new ArrayList<>();
+    // Conta institucional do médico, criada pelo ADMIN no cadastro. Fica sem getter/setter
+    // de propósito: assim o formulário não consegue preencher nada dela.
+    // Médicos antigos (import.sql) não têm conta, por isso a coluna aceita null.
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
+    @JoinColumn(name = "usuario_id", unique = true)
+    private Usuario usuario;
+
+    public void vincularUsuario(Usuario usuario) {
+        this.usuario = usuario;
+    }
 
     public Long getId() {
         return id;
@@ -120,13 +126,5 @@ public class Medico {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public List<Consulta> getConsultas() {
-        return consultas;
-    }
-
-    public void setConsultas(List<Consulta> consultas) {
-        this.consultas = consultas;
     }
 }

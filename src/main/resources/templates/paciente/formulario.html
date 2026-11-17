@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('Paciente')}"></head>
 <body>
 
@@ -55,9 +55,18 @@
                     </div>
                 </div>
 
+                <!-- A conta de acesso é criada junto com o paciente; na edição ela não é alterada. -->
+                <th:block th:if="${paciente.id == null}">
+                    <fieldset th:replace="~{fragments/layout :: credenciais}"></fieldset>
+                </th:block>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Salvar</button>
-                    <a class="btn btn-outline-secondary" th:href="@{/pacientes/list}">Cancelar</a>
+                    <!-- A lista é da equipe; quem está se cadastrando sozinho volta para o login. -->
+                    <a class="btn btn-outline-secondary" th:href="@{/pacientes/list}"
+                       sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Cancelar</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/login}"
+                       sec:authorize="!isAuthenticated()">Cancelar</a>
                 </div>
             </form>
         </div>

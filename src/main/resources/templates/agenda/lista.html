@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Horários disponíveis')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h1 class="h3 mb-0">Horários disponíveis</h1>
+        <!-- Esconder o botão é só comodidade: quem protege a URL é a SecurityConfiguration. -->
+        <a class="btn btn-primary" th:href="@{/agenda/form}"
+           sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Cadastrar horário</a>
+    </div>
+
+    <div th:replace="~{fragments/layout :: mensagem}"></div>
+    <div th:replace="~{fragments/layout :: erro}"></div>
+
+    <!-- Filtros: enviados por GET, para que a busca possa ser recarregada e compartilhada -->
+    <form class="card card-body border-0 shadow-sm mb-3" method="get" th:action="@{/agenda/list}" th:object="${filtro}">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label" for="medicoId">Médico</label>
+                <select class="form-select" th:field="*{medicoId}">
+                    <option value="">Todos</option>
+                    <option th:each="medico : ${medicos}" th:value="${medico.id}" th:text="${medico.nome}"></option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="especialidade">Especialidade</label>
+                <select class="form-select" th:field="*{especialidade}">
+                    <option value="">Todas</option>
+                    <option th:each="especialidade : ${especialidades}"
+                            th:value="${especialidade}" th:text="${especialidade}"></option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="data">Data</label>
+                <input type="date" class="form-control" th:field="*{data}">
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">Filtrar</button>
+                <a class="btn btn-outline-secondary" th:href="@{/agenda/list}">Limpar</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="alert alert-light border" th:if="${pagina.empty}">
+        Nenhum horário disponível encontrado.
+    </div>
+
+    <div class="card border-0 shadow-sm" th:unless="${pagina.empty}">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Horário</th>
+                    <th>Médico</th>
+                    <th>Especialidade</th>
+                    <th>Ações</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="agenda : ${pagina.content}">
+                    <td th:text="${#temporals.format(agenda.data, 'dd/MM/yyyy')}"></td>
+                    <td th:text="${#temporals.format(agenda.horario, 'HH:mm')}"></td>
+                    <td th:text="${agenda.medico.nome}"></td>
+                    <td th:text="${agenda.medico.especialidade}"></td>
+                    <td>
+                        <a class="btn btn-sm btn-primary"
+                           th:href="@{/agendamentos/novo/{id}(id=${agenda.id})}">Agendar</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <nav class="mt-3" aria-label="Páginas de horários" th:if="${pagina.totalPages > 1}">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item" th:classappend="${pagina.first} ? 'disabled'">
+                <a class="page-link"
+                   th:href="@{/agenda/list(page=${pagina.number - 1}, medicoId=${filtro.medicoId}, especialidade=${filtro.especialidade}, data=${filtro.data})}">Anterior</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link" th:text="|Página ${pagina.number + 1} de ${pagina.totalPages}|"></span>
+            </li>
+            <li class="page-item" th:classappend="${pagina.last} ? 'disabled'">
+                <a class="page-link"
+                   th:href="@{/agenda/list(page=${pagina.number + 1}, medicoId=${filtro.medicoId}, especialidade=${filtro.especialidade}, data=${filtro.data})}">Próxima</a>
+            </li>
+        </ul>
+    </nav>
+</main>
+
+</body>
+</html>

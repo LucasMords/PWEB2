@@ -36,3 +36,132 @@ body {
     border-color: var(--clinica-verde);
     box-shadow: 0 0 0 0.25rem rgba(18, 107, 91, 0.25);
 }
+
+/* ---------- Página de login ---------- */
+
+.login-layout {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    min-height: 100vh;
+}
+
+.login-marca {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: #ffffff;
+    background:
+        radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.14) 0, transparent 38%),
+        radial-gradient(circle at 90% 85%, rgba(255, 255, 255, 0.10) 0, transparent 42%),
+        linear-gradient(135deg, var(--clinica-verde) 0%, var(--clinica-verde-escuro) 100%);
+}
+
+.login-marca-conteudo {
+    max-width: 26rem;
+}
+
+.login-logo {
+    width: 4rem;
+    height: 4rem;
+    margin-bottom: 1.5rem;
+}
+
+.login-titulo {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.login-subtitulo {
+    font-size: 1.15rem;
+    opacity: 0.9;
+}
+
+.login-destaques {
+    margin: 2rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.login-destaques li {
+    position: relative;
+    padding: 0.45rem 0 0.45rem 1.75rem;
+    opacity: 0.92;
+}
+
+.login-destaques li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.95rem;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.2);
+}
+
+.login-painel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem;
+}
+
+.login-cartao {
+    width: 100%;
+    max-width: 25rem;
+    padding: 2.25rem;
+    border-radius: 1rem;
+    background-color: #ffffff;
+    box-shadow: 0 1rem 2.5rem rgba(18, 107, 91, 0.12);
+}
+
+.login-cartao .form-check-input:checked {
+    background-color: var(--clinica-verde);
+    border-color: var(--clinica-verde);
+}
+
+/* Em telas pequenas a marca vira uma faixa compacta acima do formulário. */
+@media (max-width: 767.98px) {
+    .login-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+
+    .login-marca {
+        padding: 2rem 1.5rem;
+    }
+
+    .login-logo {
+        width: 3rem;
+        height: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .login-titulo {
+        font-size: 1.75rem;
+    }
+
+    .login-subtitulo {
+        font-size: 1rem;
+        margin-bottom: 0;
+    }
+
+    .login-destaques {
+        display: none;
+    }
+
+    .login-painel {
+        align-items: flex-start;
+    }
+}
+
+/* Paginação no verde da clínica. */
+.pagination {
+    --bs-pagination-color: var(--clinica-verde);
+    --bs-pagination-hover-color: var(--clinica-verde-escuro);
+    --bs-pagination-focus-color: var(--clinica-verde-escuro);
+    --bs-pagination-focus-box-shadow: 0 0 0 0.25rem rgba(18, 107, 91, 0.25);
+}
