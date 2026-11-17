@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
@@ -29,6 +30,9 @@ import java.time.LocalDateTime;
 @Table(name = "agendamentos", uniqueConstraints = @UniqueConstraint(
         name = "uk_agendamento_reserva_ativa", columnNames = {"agenda_id", "reserva_ativa"}))
 public class Agendamento {
+
+    /** Com quanta antecedência ao horário a presença já pode ser confirmada. */
+    public static final Duration ANTECEDENCIA_CONFIRMACAO = Duration.ofHours(1);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,7 +53,7 @@ public class Agendamento {
     @Column(nullable = false, length = 20)
     private StatusAgendamento status = StatusAgendamento.AGENDADO;
 
-    // TRUE enquanto ocupa o horário (AGENDADO ou REALIZADO); NULL quando CANCELADO.
+    // TRUE enquanto ocupa o horário (AGENDADO, REALIZADO ou FALTOU); NULL quando CANCELADO.
     @Column(name = "reserva_ativa")
     private Boolean reservaAtiva = Boolean.TRUE;
 
@@ -67,6 +71,25 @@ public class Agendamento {
         return status == StatusAgendamento.AGENDADO;
     }
 
+    // Regras de horário das ações. Recebem o "agora" para que o serviço e a tela usem o
+    // mesmo instante (e para que os testes possam fixá-lo). O AgendamentoService as confere
+    // de novo antes de gravar; na tela elas só habilitam ou desabilitam os botões.
+
+    /** A recepção confirma a presença a partir de 1 hora antes do horário (o paciente chega antes). */
+    public boolean permiteConfirmarPresenca(LocalDateTime agora) {
+        return isAgendado() && !agora.isBefore(agenda.getDataHora().minus(ANTECEDENCIA_CONFIRMACAO));
+    }
+
+    /** A falta só pode ser registrada depois que o horário começou. */
+    public boolean permiteRegistrarFalta(LocalDateTime agora) {
+        return isAgendado() && !agora.isBefore(agenda.getDataHora());
+    }
+
+    /** O paciente só cancela antes do horário; a equipe pode cancelar a qualquer momento. */
+    public boolean permiteCancelamentoPeloPaciente(LocalDateTime agora) {
+        return isAgendado() && agora.isBefore(agenda.getDataHora());
+    }
+
     // As transições abaixo são chamadas pelo AgendamentoService, que confere antes
     // se o agendamento está AGENDADO.
 
@@ -77,6 +100,11 @@ public class Agendamento {
 
     public void marcarRealizado() {
         this.status = StatusAgendamento.REALIZADO;
+    }
+
+    /** O horário continua ocupado (reserva_ativa segue TRUE): a falta não devolve a vaga, que já passou. */
+    public void marcarFalta() {
+        this.status = StatusAgendamento.FALTOU;
     }
 
     public Long getId() {

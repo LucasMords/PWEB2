@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface AgendaRepository extends JpaRepository<Agenda, Long> {
@@ -20,6 +21,9 @@ public interface AgendaRepository extends JpaRepository<Agenda, Long> {
     boolean existsByMedicoIdAndDataAndHorario(Long medicoId, LocalDate data, LocalTime horario);
 
     boolean existsByMedicoId(Long medicoId);
+
+    /** Horários já cadastrados do médico no período, para a geração em lote pular os repetidos. */
+    List<Agenda> findByMedicoIdAndDataBetween(Long medicoId, LocalDate inicio, LocalDate fim);
 
     // O médico é LAZY e o open-in-view está desligado: a tela de confirmação precisa dele.
     @EntityGraph(attributePaths = "medico")

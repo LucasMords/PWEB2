@@ -2,13 +2,15 @@ package br.edu.ifto.aula1.Service;
 
 import br.edu.ifto.aula1.Dto.AgendaFiltro;
 import br.edu.ifto.aula1.Dto.AgendaForm;
+import br.edu.ifto.aula1.Dto.AgendaLoteForm;
 import br.edu.ifto.aula1.Model.Entity.Agenda;
 import br.edu.ifto.aula1.Model.Entity.Medico;
 import br.edu.ifto.aula1.Model.Entity.StatusAgenda;
 import br.edu.ifto.aula1.Model.repository.AgendaRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,31 +19,49 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Regras do cadastro e da consulta de horários, com os repositórios simulados. */
+/** Regras do cadastro e da consulta de horários, com os repositórios simulados e o relógio fixo. */
 @ExtendWith(MockitoExtension.class)
 class AgendaServiceTest {
 
     private static final Long MEDICO_ID = 7L;
-    private static final LocalDate AMANHA = LocalDate.now().plusDays(1);
+    private static final ZoneId FUSO = ZoneId.systemDefault();
+    // "Agora" dos testes: quinta-feira, 10/01/2030, 10h.
+    private static final LocalDateTime AGORA = LocalDateTime.of(2030, 1, 10, 10, 0);
+    private static final LocalDate HOJE = AGORA.toLocalDate();
+    private static final LocalDate AMANHA = HOJE.plusDays(1);
     private static final LocalTime NOVE_HORAS = LocalTime.of(9, 0);
 
     @Mock private AgendaRepository repository;
     @Mock private MedicoService medicoService;
-    @InjectMocks private AgendaService service;
+    private AgendaService service;
+
+    @BeforeEach
+    void preparar() {
+        service = new AgendaService(repository, medicoService, Clock.fixed(AGORA.atZone(FUSO).toInstant(), FUSO));
+    }
+
+    // ---------- Cadastro de um horário ----------
 
     @Test
     void cadastraHorarioComStatusDisponivel() {
@@ -84,10 +104,11 @@ class AgendaServiceTest {
     void rejeitaHorarioNoPassado() {
         when(medicoService.existe(MEDICO_ID)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.cadastrar(form(MEDICO_ID, LocalDate.now().minusDays(1), NOVE_HORAS)))
+        assertThatThrownBy(() -> service.cadastrar(form(MEDICO_ID, HOJE.minusDays(1), NOVE_HORAS)))
                 .isInstanceOf(RegraNegocioException.class)
                 .hasMessage("A data não pode estar no passado.");
-        assertThatThrownBy(() -> service.cadastrar(form(MEDICO_ID, LocalDate.now(), LocalTime.MIDNIGHT)))
+        // Hoje, mas antes das 10h do relógio.
+        assertThatThrownBy(() -> service.cadastrar(form(MEDICO_ID, HOJE, NOVE_HORAS)))
                 .isInstanceOf(RegraNegocioException.class)
                 .hasMessage("O horário já passou.");
         verify(repository, never()).saveAndFlush(any());
@@ -109,11 +130,13 @@ class AgendaServiceTest {
         verify(repository, never()).saveAndFlush(any());
     }
 
+    // ---------- Consulta de horários ----------
+
     @Test
     void listaApenasHorariosDisponiveisAplicandoOsFiltros() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Agenda> pagina = new PageImpl<>(List.of(new Agenda(new Medico(), AMANHA, NOVE_HORAS)));
-        when(repository.buscarFuturos(eq(StatusAgenda.DISPONIVEL), eq(LocalDate.now()), any(LocalTime.class),
+        when(repository.buscarFuturos(eq(StatusAgenda.DISPONIVEL), eq(HOJE), eq(AGORA.toLocalTime()),
                 eq(MEDICO_ID), eq(AMANHA), isNull(), eq(pageable))).thenReturn(pagina);
 
         AgendaFiltro filtro = new AgendaFiltro();
@@ -128,7 +151,7 @@ class AgendaServiceTest {
     void horarioReservadoOuPassadoNaoServeParaATelaDeConfirmacao() {
         Agenda reservado = new Agenda(new Medico(), AMANHA, NOVE_HORAS);
         reservado.reservar();
-        Agenda passado = new Agenda(new Medico(), LocalDate.now().minusDays(1), NOVE_HORAS);
+        Agenda passado = new Agenda(new Medico(), HOJE.minusDays(1), NOVE_HORAS);
         when(repository.findComMedicoById(1L)).thenReturn(Optional.of(reservado));
         when(repository.findComMedicoById(2L)).thenReturn(Optional.of(passado));
         when(repository.findComMedicoById(3L)).thenReturn(Optional.empty());
@@ -138,6 +161,118 @@ class AgendaServiceTest {
         assertThatThrownBy(() -> service.buscarDisponivel(2L))
                 .isInstanceOf(RegraNegocioException.class).hasMessage(AgendaService.HORARIO_INDISPONIVEL);
         assertThatThrownBy(() -> service.buscarDisponivel(3L)).isInstanceOf(RegistroNaoEncontradoException.class);
+    }
+
+    // ---------- Geração em lote ----------
+
+    @Test
+    void loteGeraUmHorarioPorIntervaloSoNosDiasEscolhidosEPulaOsQueJaExistem() {
+        Medico medico = medicoExistente();
+        // Segunda 14/01 a domingo 20/01, só segundas e quartas, das 8h às 10h, a cada 30 minutos.
+        AgendaLoteForm form = lote(LocalDate.of(2030, 1, 14), LocalDate.of(2030, 1, 20),
+                EnumSet.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), "08:00", "10:00", 30);
+        // 08:30 de segunda já está na agenda.
+        when(repository.findByMedicoIdAndDataBetween(MEDICO_ID, form.getDataInicio(), form.getDataFim()))
+                .thenReturn(List.of(new Agenda(medico, LocalDate.of(2030, 1, 14), LocalTime.of(8, 30))));
+
+        AgendaService.ResultadoLote resultado = service.gerarEmLote(form);
+
+        // 4 horários por dia (8:00, 8:30, 9:00, 9:30; o das 10h terminaria depois do fim) x 2 dias, menos 1 repetido.
+        assertThat(resultado.gerados()).isEqualTo(7);
+        assertThat(resultado.ignorados()).isEqualTo(1);
+
+        List<Agenda> gravados = gravadosNoLote();
+        assertThat(gravados).hasSize(7)
+                .allSatisfy(agenda -> {
+                    assertThat(agenda.getStatus()).isEqualTo(StatusAgenda.DISPONIVEL);
+                    assertThat(agenda.getMedico()).isSameAs(medico);
+                    assertThat(agenda.getData().getDayOfWeek()).isIn(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY);
+                });
+        assertThat(gravados).extracting(Agenda::getDataHora)
+                .doesNotContain(LocalDateTime.of(2030, 1, 14, 8, 30))
+                .contains(LocalDateTime.of(2030, 1, 16, 9, 30));
+    }
+
+    @Test
+    void lotePulaOsHorariosDeHojeQueJaPassaram() {
+        medicoExistente();
+        // Hoje (quinta), das 8h às 12h: às 10h do relógio, 8:00 a 10:00 já passaram.
+        AgendaLoteForm form = lote(HOJE, HOJE, EnumSet.of(DayOfWeek.THURSDAY), "08:00", "12:00", 30);
+        when(repository.findByMedicoIdAndDataBetween(any(), any(), any())).thenReturn(List.of());
+
+        AgendaService.ResultadoLote resultado = service.gerarEmLote(form);
+
+        assertThat(resultado.gerados()).isEqualTo(3); // 10:30, 11:00, 11:30
+        assertThat(resultado.ignorados()).isEqualTo(5);
+        assertThat(gravadosNoLote()).extracting(Agenda::getHorario)
+                .containsExactly(LocalTime.of(10, 30), LocalTime.of(11, 0), LocalTime.of(11, 30));
+    }
+
+    @Test
+    void loteComDadosInconsistentesERejeitadoNoCampoCorretoSemGravar() {
+        when(medicoService.existe(MEDICO_ID)).thenReturn(true);
+
+        assertCampoInvalido("dataFim", form -> form.setDataFim(form.getDataInicio().minusDays(1)));
+        assertCampoInvalido("dataFim", form -> form.setDataFim(form.getDataInicio().plusDays(AgendaService.PERIODO_MAXIMO_DIAS)));
+        assertCampoInvalido("dataInicio", form -> form.setDataInicio(HOJE.minusDays(1)));
+        assertCampoInvalido("diasSemana", form -> form.setDiasSemana(EnumSet.noneOf(DayOfWeek.class)));
+        assertCampoInvalido("horaFim", form -> form.setHoraFim(form.getHoraInicio()));
+        assertCampoInvalido("horaFim", form -> form.setHoraFim(form.getHoraInicio().plusMinutes(20)));
+        assertCampoInvalido("duracaoMinutos", form -> form.setDuracaoMinutos(5));
+
+        verify(repository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    void loteSemNenhumHorarioNovoOuGrandeDemaisERejeitado() {
+        Medico medico = medicoExistente();
+        AgendaLoteForm repetido = lote(AMANHA, AMANHA, EnumSet.of(AMANHA.getDayOfWeek()), "09:00", "09:30", 30);
+        when(repository.findByMedicoIdAndDataBetween(MEDICO_ID, AMANHA, AMANHA))
+                .thenReturn(List.of(new Agenda(medico, AMANHA, NOVE_HORAS)));
+
+        assertThatThrownBy(() -> service.gerarEmLote(repetido))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessageStartingWith("Nenhum horário novo para gerar");
+
+        // 92 dias, todos os dias, o dia inteiro a cada 10 minutos: bem acima do limite.
+        AgendaLoteForm enorme = lote(AMANHA, AMANHA.plusDays(AgendaService.PERIODO_MAXIMO_DIAS - 1),
+                EnumSet.allOf(DayOfWeek.class), "00:00", "23:50", 10);
+        when(repository.findByMedicoIdAndDataBetween(MEDICO_ID, enorme.getDataInicio(), enorme.getDataFim()))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.gerarEmLote(enorme))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessageContaining("o máximo é " + AgendaService.MAXIMO_HORARIOS_LOTE);
+        verify(repository, never()).saveAllAndFlush(anyList());
+    }
+
+    @Test
+    void loteBarradoPelaRestricaoUnicaNaoGravaNadaEPedeParaTentarDeNovo() {
+        medicoExistente();
+        when(repository.findByMedicoIdAndDataBetween(any(), any(), any())).thenReturn(List.of());
+        when(repository.saveAllAndFlush(anyList())).thenThrow(new DataIntegrityViolationException("uk"));
+
+        assertThatThrownBy(() -> service.gerarEmLote(loteValido()))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage("A agenda deste médico foi alterada por outra pessoa ao mesmo tempo. Tente novamente.");
+    }
+
+    // ---------- Apoio ----------
+
+    private void assertCampoInvalido(String campo, Consumer<AgendaLoteForm> alteracao) {
+        AgendaLoteForm form = loteValido();
+        alteracao.accept(form);
+
+        assertThatThrownBy(() -> service.gerarEmLote(form))
+                .isInstanceOf(RegraNegocioException.class)
+                .extracting(e -> ((RegraNegocioException) e).getCampo()).isEqualTo(campo);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Agenda> gravadosNoLote() {
+        ArgumentCaptor<List<Agenda>> captor = ArgumentCaptor.forClass(List.class);
+        verify(repository).saveAllAndFlush(captor.capture());
+        return captor.getValue();
     }
 
     private Medico medicoExistente() {
@@ -153,6 +288,23 @@ class AgendaServiceTest {
         form.setMedicoId(medicoId);
         form.setData(data);
         form.setHorario(horario);
+        return form;
+    }
+
+    private static AgendaLoteForm loteValido() {
+        return lote(AMANHA, AMANHA.plusDays(6), EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), "08:00", "12:00", 30);
+    }
+
+    private static AgendaLoteForm lote(LocalDate inicio, LocalDate fim, EnumSet<DayOfWeek> dias,
+                                       String horaInicio, String horaFim, int duracao) {
+        AgendaLoteForm form = new AgendaLoteForm();
+        form.setMedicoId(MEDICO_ID);
+        form.setDataInicio(inicio);
+        form.setDataFim(fim);
+        form.setDiasSemana(dias);
+        form.setHoraInicio(LocalTime.parse(horaInicio));
+        form.setHoraFim(LocalTime.parse(horaFim));
+        form.setDuracaoMinutos(duracao);
         return form;
     }
 }

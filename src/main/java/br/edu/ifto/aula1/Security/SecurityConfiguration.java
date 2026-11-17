@@ -17,7 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
  * - visitante: página de login e cadastro de paciente;
  * - PACIENTE: início, os próprios dados, agendamentos e consultas, e os horários livres;
  * - USER (recepção) e MEDICO: pacientes, consultas, a lista de médicos e a agenda;
- * - USER e ADMIN: confirmação de presença dos agendamentos;
+ * - USER e ADMIN: confirmação de presença e registro de falta dos agendamentos;
  * - ADMIN: tudo, incluindo cadastro de médicos, exclusões e o console H2.
  */
 @Configuration
@@ -48,8 +48,10 @@ public class SecurityConfiguration {
                         // no AgendamentoService); a equipe escolhe o paciente.
                         .requestMatchers(HttpMethod.GET, "/agenda/list", "/agendamentos/novo/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/agendamentos/save", "/agendamentos/cancelar/**").authenticated()
-                        // Confirmar a presença (o que cria a Consulta) é só da administração e da recepção.
-                        .requestMatchers("/agendamentos/confirmar/**").hasAnyRole(Perfil.ADMIN, Perfil.USER)
+                        // Confirmar a presença (o que cria a Consulta) e registrar falta é só da
+                        // administração e da recepção.
+                        .requestMatchers("/agendamentos/confirmar/**", "/agendamentos/falta/**")
+                                .hasAnyRole(Perfil.ADMIN, Perfil.USER)
                         // O restante da agenda (cadastro de horários, gerenciamento) é da equipe.
                         .requestMatchers("/agenda/**", "/agendamentos/**")
                                 .hasAnyRole(Perfil.ADMIN, Perfil.USER, Perfil.MEDICO)

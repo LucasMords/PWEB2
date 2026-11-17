@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Gerar horários em lote')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container">
+    <div class="row">
+        <div class="col-lg-8">
+            <h1 class="h3 mb-1">Gerar horários em lote</h1>
+            <p class="text-secondary">
+                Um horário a cada intervalo, do horário inicial ao final, nos dias da semana marcados.
+                Horários que já existem ou que já passaram são ignorados, então o mesmo lote pode ser gerado de novo.
+            </p>
+
+            <div th:replace="~{fragments/layout :: mensagem}"></div>
+
+            <!-- novalidate: o navegador não valida nada; quem valida é o back-end -->
+            <form class="card card-body border-0 shadow-sm"
+                  th:action="@{/agenda/lote}"
+                  th:object="${form}"
+                  method="post"
+                  novalidate>
+
+                <div th:replace="~{fragments/layout :: erros}"></div>
+                <div class="alert alert-danger" role="alert" th:each="erroGlobal : ${#fields.globalErrors()}"
+                     th:text="${erroGlobal}"></div>
+
+                <!-- Administração e recepção escolhem o médico -->
+                <div class="mb-3" th:if="${medicoAutenticado == null}">
+                    <label class="form-label" for="medicoId">Médico</label>
+                    <select class="form-select" th:field="*{medicoId}" th:errorclass="is-invalid">
+                        <option value="">Selecione</option>
+                        <option th:each="medico : ${medicos}"
+                                th:value="${medico.id}"
+                                th:text="${medico.nome + ' - ' + medico.especialidade}">
+                        </option>
+                    </select>
+                    <div class="invalid-feedback" th:errors="*{medicoId}"></div>
+                </div>
+
+                <!-- O médico gera horários apenas na própria agenda: o servidor usa a conta autenticada -->
+                <div class="mb-3" th:if="${medicoAutenticado != null}">
+                    <label class="form-label" for="medicoNome">Médico</label>
+                    <input type="text" class="form-control" id="medicoNome" readonly disabled
+                           th:value="${medicoAutenticado.nome + ' - ' + medicoAutenticado.especialidade}">
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="dataInicio">De</label>
+                        <input type="date" class="form-control" th:field="*{dataInicio}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{dataInicio}"></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label" for="dataFim">Até</label>
+                        <input type="date" class="form-control" th:field="*{dataFim}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{dataFim}"></div>
+                        <div class="form-text">No máximo 92 dias.</div>
+                    </div>
+                </div>
+
+                <fieldset class="mb-3">
+                    <legend class="form-label fs-6">Dias da semana</legend>
+                    <div th:classappend="${#fields.hasErrors('diasSemana')} ? 'is-invalid'">
+                        <div class="form-check form-check-inline" th:each="dia : ${diasDaSemana}">
+                            <input class="form-check-input" type="checkbox"
+                                   th:field="*{diasSemana}" th:value="${dia.key}">
+                            <label class="form-check-label" th:for="${#ids.prev('diasSemana')}"
+                                   th:text="${dia.value}">Seg</label>
+                        </div>
+                    </div>
+                    <div class="invalid-feedback" th:errors="*{diasSemana}"></div>
+                </fieldset>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="horaInicio">Das</label>
+                        <input type="time" class="form-control" th:field="*{horaInicio}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{horaInicio}"></div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="horaFim">Até</label>
+                        <input type="time" class="form-control" th:field="*{horaFim}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{horaFim}"></div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="duracaoMinutos">Duração (minutos)</label>
+                        <input type="number" class="form-control" th:field="*{duracaoMinutos}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{duracaoMinutos}"></div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary">Gerar horários</button>
+                    <a class="btn btn-outline-secondary" th:href="@{/agenda/form}">Cadastrar um horário</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/agenda/list}">Ver horários disponíveis</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

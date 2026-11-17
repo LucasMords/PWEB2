@@ -49,5 +49,12 @@ INSERT INTO agendas (medico_id, data, horario, status) VALUES (2, DATEADD(DAY, 3
 -- Um horario ja reservado (Mariana com a Dra. Beatriz): aguarda a confirmacao de presenca, sem consulta.
 INSERT INTO agendas (medico_id, data, horario, status) VALUES (1, DATEADD(DAY, 2, CURRENT_DATE), '10:00:00', 'AGENDADO');
 INSERT INTO agendamentos (agenda_id, paciente_id, data_criacao, status, reserva_ativa) VALUES ((SELECT id FROM agendas WHERE medico_id = 1 AND data = DATEADD(DAY, 2, CURRENT_DATE) AND horario = '10:00:00'), 3, CURRENT_TIMESTAMP, 'AGENDADO', TRUE);
+-- Um horario de ontem ainda AGENDADO (Ana com o Dr. Eduardo): a recepcao pode confirmar a presenca
+-- ou registrar a falta, que so valem a partir do horario da consulta.
+INSERT INTO agendas (medico_id, data, horario, status) VALUES (2, DATEADD(DAY, -1, CURRENT_DATE), '16:00:00', 'AGENDADO');
+INSERT INTO agendamentos (agenda_id, paciente_id, data_criacao, status, reserva_ativa) VALUES ((SELECT id FROM agendas WHERE medico_id = 2 AND data = DATEADD(DAY, -1, CURRENT_DATE) AND horario = '16:00:00'), 1, DATEADD(DAY, -3, CURRENT_TIMESTAMP), 'AGENDADO', TRUE);
+-- Uma falta no historico (Carlos com a Dra. Beatriz): o horario segue ocupado e nao ha consulta.
+INSERT INTO agendas (medico_id, data, horario, status) VALUES (1, '2026-09-10', '08:00:00', 'AGENDADO');
+INSERT INTO agendamentos (agenda_id, paciente_id, data_criacao, status, reserva_ativa) VALUES ((SELECT id FROM agendas WHERE medico_id = 1 AND data = '2026-09-10' AND horario = '08:00:00'), 2, '2026-09-01 11:20:00', 'FALTOU', TRUE);
 -- Um agendamento cancelado (Carlos com o Dr. Eduardo): fica no historico e o horario voltou a ficar livre.
 INSERT INTO agendamentos (agenda_id, paciente_id, data_criacao, status, reserva_ativa) VALUES ((SELECT id FROM agendas WHERE medico_id = 2 AND data = DATEADD(DAY, 3, CURRENT_DATE) AND horario = '15:00:00'), 2, CURRENT_TIMESTAMP, 'CANCELADO', NULL);

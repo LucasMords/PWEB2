@@ -2,6 +2,7 @@ package br.edu.ifto.aula1.Controller;
 
 import br.edu.ifto.aula1.Dto.AgendaFiltro;
 import br.edu.ifto.aula1.Dto.AgendaForm;
+import br.edu.ifto.aula1.Dto.AgendaLoteForm;
 import br.edu.ifto.aula1.Model.Entity.Medico;
 import br.edu.ifto.aula1.Security.Papeis;
 import br.edu.ifto.aula1.Service.AgendaService;
@@ -22,12 +23,28 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.format.TextStyle;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+
 /** Horários da agenda dos médicos: cadastro de disponibilidade e consulta dos horários livres. */
 @Controller
 @RequestMapping("agenda")
 public class AgendaController {
 
     private static final int TAMANHO_PAGINA = 10;
+
+    /** Dias da semana do formulário de lote, na ordem de segunda a domingo, com o nome em português. */
+    private static final Map<DayOfWeek, String> DIAS_DA_SEMANA = new LinkedHashMap<>();
+    static {
+        for (DayOfWeek dia : DayOfWeek.values()) {
+            String nome = dia.getDisplayName(TextStyle.SHORT, Locale.of("pt", "BR")).replace(".", "");
+            DIAS_DA_SEMANA.put(dia, Character.toUpperCase(nome.charAt(0)) + nome.substring(1));
+        }
+    }
 
     private final AgendaService service;
     private final MedicoService medicoService;
@@ -70,16 +87,64 @@ public class AgendaController {
         try {
             service.cadastrar(form);
         } catch (RegraNegocioException e) {
-            // Regra de negócio violada: volta ao formulário com a mensagem no campo correspondente.
-            if (e.getCampo() != null)
-                result.rejectValue(e.getCampo(), "RegraNegocio", e.getMessage());
-            else
-                result.reject("RegraNegocio", e.getMessage());
+            rejeitar(result, e);
             return formulario(autenticacao, model);
         }
 
         attributes.addFlashAttribute("mensagem", "Horário cadastrado com sucesso.");
         return new ModelAndView("redirect:/agenda/form");
+    }
+
+    /** Geração de vários horários de uma vez (dias da semana, faixa de horário e duração). */
+    @GetMapping("/lote")
+    public ModelAndView lote(Authentication autenticacao, ModelMap model) {
+        AgendaLoteForm form = new AgendaLoteForm();
+        form.setDataInicio(LocalDate.now());
+        form.setDataFim(LocalDate.now().plusWeeks(4));
+        model.addAttribute("form", form);
+        return formularioLote(autenticacao, model);
+    }
+
+    @PostMapping("/lote")
+    public ModelAndView gerarLote(@Valid @ModelAttribute("form") AgendaLoteForm form, BindingResult result,
+                                  Authentication autenticacao, ModelMap model, RedirectAttributes attributes) {
+        // Mesma regra do cadastro individual: o médico só gera horários na própria agenda.
+        Medico medicoAutenticado = medicoRestrito(autenticacao);
+        if (medicoAutenticado != null)
+            form.setMedicoId(medicoAutenticado.getId());
+        else if (form.getMedicoId() == null && !result.hasFieldErrors("medicoId"))
+            result.rejectValue("medicoId", "NotNull", "Selecione o médico.");
+
+        if (result.hasErrors())
+            return formularioLote(autenticacao, model);
+
+        AgendaService.ResultadoLote resultado;
+        try {
+            resultado = service.gerarEmLote(form);
+        } catch (RegraNegocioException e) {
+            rejeitar(result, e);
+            return formularioLote(autenticacao, model);
+        }
+
+        String mensagem = resultado.gerados() + (resultado.gerados() == 1 ? " horário gerado." : " horários gerados.");
+        if (resultado.ignorados() > 0)
+            mensagem += " " + resultado.ignorados() + " já existiam ou já passaram e foram ignorados.";
+        attributes.addFlashAttribute("mensagem", mensagem);
+        return new ModelAndView("redirect:/agenda/lote");
+    }
+
+    private ModelAndView formularioLote(Authentication autenticacao, ModelMap model) {
+        model.addAttribute("diasDaSemana", DIAS_DA_SEMANA);
+        formulario(autenticacao, model);
+        return new ModelAndView("agenda/lote", model);
+    }
+
+    /** Regra de negócio violada: volta ao formulário com a mensagem no campo correspondente. */
+    private static void rejeitar(BindingResult result, RegraNegocioException e) {
+        if (e.getCampo() != null)
+            result.rejectValue(e.getCampo(), "RegraNegocio", e.getMessage());
+        else
+            result.reject("RegraNegocio", e.getMessage());
     }
 
     private ModelAndView formulario(Authentication autenticacao, ModelMap model) {

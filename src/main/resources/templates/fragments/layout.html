@@ -48,7 +48,8 @@
 <!-- Selo colorido com a situação de um agendamento -->
 <span th:fragment="statusAgendamento(status)" class="badge"
       th:classappend="${status.name() == 'REALIZADO'} ? 'text-bg-success'
-                    : (${status.name() == 'CANCELADO'} ? 'text-bg-danger' : 'text-bg-warning')"
+                    : (${status.name() == 'CANCELADO'} ? 'text-bg-danger'
+                    : (${status.name() == 'FALTOU'} ? 'text-bg-secondary' : 'text-bg-warning'))"
       th:text="${status.descricao}"></span>
 
 <!-- JavaScript do Bootstrap (modais) e o script que prepara os modais de confirmação.

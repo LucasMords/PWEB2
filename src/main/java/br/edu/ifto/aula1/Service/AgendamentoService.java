@@ -18,21 +18,25 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 /**
- * Regras de agendamento, cancelamento e confirmação de presença.
+ * Regras de agendamento, cancelamento, confirmação de presença e registro de falta.
  *
  * Concorrência: cada operação de escrita começa lendo, com bloqueio pessimista
  * (SELECT ... FOR UPDATE), o registro que decide a regra: a Agenda ao reservar, o
- * Agendamento ao cancelar ou confirmar. Quem chega depois espera o commit de quem chegou
- * primeiro e então lê o estado já atualizado, de modo que a verificação de status feita
- * aqui vale até o fim da transação. As restrições únicas do banco (um agendamento ativo
- * por horário, uma consulta por agendamento) ficam como segunda barreira.
+ * Agendamento ao cancelar, confirmar ou registrar falta. Quem chega depois espera o commit
+ * de quem chegou primeiro e então lê o estado já atualizado, de modo que a verificação de
+ * status feita aqui vale até o fim da transação. As restrições únicas do banco (um
+ * agendamento ativo por horário, uma consulta por agendamento) ficam como segunda barreira.
  */
 @Service
 @Transactional(readOnly = true)
 public class AgendamentoService {
+
+    static final String PRESENCA_JA_CONFIRMADA = "A presença deste agendamento já foi confirmada.";
+    static final String FALTA_JA_REGISTRADA = "A falta deste agendamento já foi registrada.";
 
     private static final Logger log = LoggerFactory.getLogger(AgendamentoService.class);
 
@@ -40,13 +44,21 @@ public class AgendamentoService {
     private final AgendaRepository agendaRepository;
     private final ConsultaRepository consultaRepository;
     private final PacienteService pacienteService;
+    private final Clock clock;
 
     public AgendamentoService(AgendamentoRepository repository, AgendaRepository agendaRepository,
-                              ConsultaRepository consultaRepository, PacienteService pacienteService) {
+                              ConsultaRepository consultaRepository, PacienteService pacienteService,
+                              Clock clock) {
         this.repository = repository;
         this.agendaRepository = agendaRepository;
         this.consultaRepository = consultaRepository;
         this.pacienteService = pacienteService;
+        this.clock = clock;
+    }
+
+    /** O instante que as telas usam para habilitar ou desabilitar as ações. */
+    public LocalDateTime agora() {
+        return LocalDateTime.now(clock);
     }
 
     public Page<Agendamento> listar(AgendamentoFiltro filtro, Pageable pageable) {
@@ -76,7 +88,7 @@ public class AgendamentoService {
                 || repository.existsByAgendaIdAndStatusNot(agenda.getId(), StatusAgendamento.CANCELADO))
             throw new RegraNegocioException(AgendaService.HORARIO_INDISPONIVEL);
 
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = agora();
         if (!agenda.getDataHora().isAfter(agora))
             throw new RegraNegocioException("Não é possível agendar um horário que já passou.");
 
@@ -90,15 +102,18 @@ public class AgendamentoService {
         }
     }
 
-    /** Cancelamento feito pela equipe da clínica. */
+    /** Cancelamento feito pela equipe da clínica, a qualquer momento (ex.: o médico não pôde atender). */
     @Transactional
     public void cancelar(Long id) {
-        cancelar(bloquearAgendamento(id));
+        Agendamento agendamento = bloquearAgendamento(id);
+        exigirAgendado(agendamento, Acao.CANCELAR);
+        cancelar(agendamento);
     }
 
     /**
-     * Cancelamento feito pelo próprio paciente. Se o agendamento for de outra pessoa, a
-     * resposta é a mesma de um agendamento inexistente, para não revelar que ele existe.
+     * Cancelamento feito pelo próprio paciente, só antes do horário. Se o agendamento for de
+     * outra pessoa, a resposta é a mesma de um agendamento inexistente, para não revelar que
+     * ele existe.
      */
     @Transactional
     public void cancelarDoPaciente(Long id, Long pacienteId) {
@@ -109,43 +124,81 @@ public class AgendamentoService {
             throw new RegistroNaoEncontradoException("Agendamento não encontrado.");
         }
 
+        exigirAgendado(agendamento, Acao.CANCELAR);
+        if (!agendamento.permiteCancelamentoPeloPaciente(agora()))
+            throw new RegraNegocioException("O horário deste agendamento já passou. Fale com a clínica.");
+
         cancelar(agendamento);
     }
 
     /** O registro não é excluído: fica CANCELADO, como histórico, e o horário volta a ficar livre. */
     private void cancelar(Agendamento agendamento) {
-        switch (agendamento.getStatus()) {
-            case REALIZADO -> throw new RegraNegocioException("Não é possível cancelar um agendamento já realizado.");
-            case CANCELADO -> throw new RegraNegocioException("Este agendamento já foi cancelado.");
-            case AGENDADO -> {
-                agendamento.cancelar();
-                agendamento.getAgenda().liberar();
-                // Entidades gerenciadas: as duas alterações são gravadas juntas no commit.
-            }
-        }
+        agendamento.cancelar();
+        agendamento.getAgenda().liberar();
+        // Entidades gerenciadas: as duas alterações são gravadas juntas no commit.
     }
 
     /**
      * Confirma que o paciente compareceu: cria a Consulta e marca o agendamento como
-     * REALIZADO, na mesma transação. Uma segunda tentativa é rejeitada, sem criar outra consulta.
+     * REALIZADO, na mesma transação. Só vale a partir de 1 hora antes do horário. Uma
+     * segunda tentativa é rejeitada, sem criar outra consulta.
      */
     @Transactional
     public Consulta confirmarPresenca(Long id) {
         Agendamento agendamento = bloquearAgendamento(id);
 
-        if (agendamento.getStatus() == StatusAgendamento.CANCELADO)
-            throw new RegraNegocioException("Não é possível confirmar a presença em um agendamento cancelado.");
-        if (agendamento.getStatus() == StatusAgendamento.REALIZADO
-                || consultaRepository.existsByAgendamentoId(agendamento.getId()))
-            throw new RegraNegocioException("A presença deste agendamento já foi confirmada.");
+        if (agendamento.getStatus() == StatusAgendamento.AGENDADO
+                && consultaRepository.existsByAgendamentoId(agendamento.getId()))
+            throw new RegraNegocioException(PRESENCA_JA_CONFIRMADA);
+        exigirAgendado(agendamento, Acao.CONFIRMAR_PRESENCA);
+
+        LocalDateTime agora = agora();
+        if (!agendamento.permiteConfirmarPresenca(agora))
+            throw new RegraNegocioException("A presença só pode ser confirmada a partir de "
+                    + Agendamento.ANTECEDENCIA_CONFIRMACAO.toHours() + " hora antes do horário da consulta.");
 
         agendamento.marcarRealizado();
         try {
-            return consultaRepository.saveAndFlush(new Consulta(agendamento, LocalDateTime.now()));
+            return consultaRepository.saveAndFlush(new Consulta(agendamento, agora));
         } catch (DataIntegrityViolationException e) {
             log.warn("Consulta duplicada para o agendamento {} barrada pelo banco", id);
-            throw new RegraNegocioException("A presença deste agendamento já foi confirmada.");
+            throw new RegraNegocioException(PRESENCA_JA_CONFIRMADA);
         }
+    }
+
+    /**
+     * Registra que o paciente não compareceu. O agendamento fica como FALTOU, nenhuma
+     * consulta é criada e o horário (que já passou) continua ocupado.
+     */
+    @Transactional
+    public void registrarFalta(Long id) {
+        Agendamento agendamento = bloquearAgendamento(id);
+        exigirAgendado(agendamento, Acao.REGISTRAR_FALTA);
+
+        if (!agendamento.permiteRegistrarFalta(agora()))
+            throw new RegraNegocioException("A falta só pode ser registrada depois do horário da consulta.");
+
+        agendamento.marcarFalta();
+    }
+
+    private enum Acao { CANCELAR, CONFIRMAR_PRESENCA, REGISTRAR_FALTA }
+
+    /** Toda transição parte de AGENDADO. A mensagem explica por que a ação não cabe no status atual. */
+    private static void exigirAgendado(Agendamento agendamento, Acao acao) {
+        String motivo = switch (agendamento.getStatus()) {
+            case AGENDADO -> null;
+            case REALIZADO -> acao == Acao.CANCELAR
+                    ? "Não é possível cancelar um agendamento já realizado." : PRESENCA_JA_CONFIRMADA;
+            case FALTOU -> acao == Acao.CANCELAR
+                    ? "Não é possível cancelar um agendamento com falta registrada." : FALTA_JA_REGISTRADA;
+            case CANCELADO -> switch (acao) {
+                case CANCELAR -> "Este agendamento já foi cancelado.";
+                case CONFIRMAR_PRESENCA -> "Não é possível confirmar a presença em um agendamento cancelado.";
+                case REGISTRAR_FALTA -> "Não é possível registrar falta em um agendamento cancelado.";
+            };
+        };
+        if (motivo != null)
+            throw new RegraNegocioException(motivo);
     }
 
     private Agenda bloquearAgenda(Long id) {

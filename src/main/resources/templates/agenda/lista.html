@@ -9,8 +9,10 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h1 class="h3 mb-0">Horários disponíveis</h1>
         <!-- Esconder o botão é só comodidade: quem protege a URL é a SecurityConfiguration. -->
-        <a class="btn btn-primary" th:href="@{/agenda/form}"
-           sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Cadastrar horário</a>
+        <div class="d-flex flex-wrap gap-2" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">
+            <a class="btn btn-outline-primary" th:href="@{/agenda/lote}">Gerar horários em lote</a>
+            <a class="btn btn-primary" th:href="@{/agenda/form}">Cadastrar horário</a>
+        </div>
     </div>
 
     <div th:replace="~{fragments/layout :: mensagem}"></div>

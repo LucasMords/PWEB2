@@ -96,6 +96,7 @@ public class UsuarioController {
         model.addAttribute("titulo", "Meus agendamentos");
         model.addAttribute("urlLista", "/usuario/agendamentos");
         model.addAttribute("pagina", pagina);
+        model.addAttribute("agora", agendamentoService.agora());
         return new ModelAndView("agendamento/lista", model);
     }
 }

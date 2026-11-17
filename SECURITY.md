@@ -67,10 +67,12 @@ remember-me cookies stop being valid.
   (`GET /agendamentos/novo/{agendaId}`, `POST /agendamentos/save`) and
   cancelling a booking (`POST /agendamentos/cancelar/{id}`).
 - `ADMIN`, `USER` and `MEDICO`: patients, the list of doctors, registering time
-  slots (`/agenda/form`, `POST /agenda/save`), the booking management page
-  (`/agendamentos/list`) and the appointment history (`/consultas/**`).
+  slots (`/agenda/form`, `POST /agenda/save`, and in batch: `/agenda/lote`), the
+  booking management page (`/agendamentos/list`) and the appointment history
+  (`/consultas/**`).
 - `ADMIN` and `USER` only: confirming a patient's attendance
-  (`POST /agendamentos/confirmar/{id}`), which is what creates the `Consulta`.
+  (`POST /agendamentos/confirmar/{id}`), which is what creates the `Consulta`, and
+  recording a no-show (`POST /agendamentos/falta/{id}`).
 - `ADMIN` only: add/edit/remove doctors, remove patients, and the H2 console.
 - A `PACIENTE` cannot open the patient, doctor, booking management or
   appointment history pages, so one patient never sees another patient's data.
@@ -79,11 +81,12 @@ remember-me cookies stop being valid.
 - Ownership is enforced on the server, not by the forms:
   - a `PACIENTE` always books for the patient linked to the account; a
     `pacienteId` sent in the request is ignored (`AgendamentoController.save`);
-  - a `PACIENTE` can only cancel their own booking; for anyone else's the answer
-    is `404`, the same as for a booking that does not exist
-    (`AgendamentoService.cancelarDoPaciente`);
-  - a `MEDICO` can only register slots in their own schedule; a `medicoId` sent
-    in the request is ignored (`AgendaController.save`).
+  - a `PACIENTE` can only cancel their own booking, and only before its time; for
+    anyone else's the answer is `404`, the same as for a booking that does not
+    exist (`AgendamentoService.cancelarDoPaciente`);
+  - a `MEDICO` can only register slots in their own schedule, one by one or in
+    batch; a `medicoId` sent in the request is ignored (`AgendaController.save`,
+    `AgendaController.gerarLote`).
 - Buttons and menu items are hidden with `sec:authorize` according to the
   profile; the URL rules in `SecurityConfiguration` are what enforce access.
 - A user without the required profile gets `403` (`templates/error/403.html`).
@@ -105,7 +108,7 @@ remember-me cookies stop being valid.
 
 Removals (`/medicos/remove/{id}`, `/pacientes/remove/{id}`) and the booking
 actions (`/agendamentos/save`, `/agendamentos/cancelar/{id}`,
-`/agendamentos/confirmar/{id}`) are POST requests sent by forms with
+`/agendamentos/confirmar/{id}`, `/agendamentos/falta/{id}`) are POST requests sent by forms with
 `th:action`, so they carry the CSRF token like every other form. A GET to those
 URLs answers `405`.
 

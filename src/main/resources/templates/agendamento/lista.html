@@ -7,7 +7,8 @@
 
 <nav th:replace="~{fragments/layout :: navbar}"></nav>
 
-<main class="container">
+<main class="container"
+      th:with="equipe=${#authorization.expression('hasAnyRole(''ADMIN'',''USER'',''MEDICO'')')}">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h1 class="h3 mb-0" th:text="${titulo}">Agendamentos</h1>
         <a class="btn btn-primary" th:href="@{/agenda/list}">Novo agendamento</a>
@@ -78,20 +79,28 @@
                     <td th:text="${agendamento.agenda.medico.nome}"></td>
                     <td><span th:replace="~{fragments/layout :: statusAgendamento(${agendamento.status})}"></span></td>
                     <td>
-                        <!-- As ações só valem para agendamentos AGENDADOS; nos demais ficam desabilitadas.
-                             O servidor confere o status de novo, qualquer que seja o estado do botão. -->
-                        <div class="d-flex gap-2">
+                        <!-- Cada ação só fica habilitada quando cabe no status e no horário:
+                             confirmar presença a partir de 1 hora antes, registrar falta depois do
+                             horário, e o paciente cancela só antes do horário. O servidor confere
+                             tudo de novo, qualquer que seja o estado do botão. -->
+                        <div class="d-flex flex-wrap gap-2">
                             <button type="button" class="btn btn-sm btn-primary"
                                     sec:authorize="hasAnyRole('ADMIN','USER')"
                                     data-bs-toggle="modal" data-bs-target="#modalConfirmar"
                                     th:data-acao="@{/agendamentos/confirmar/{id}(id=${agendamento.id})}"
                                     th:data-descricao="${descricao}"
-                                    th:disabled="${!agendamento.agendado}">Confirmar presença</button>
+                                    th:disabled="${!agendamento.permiteConfirmarPresenca(agora)}">Confirmar presença</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    sec:authorize="hasAnyRole('ADMIN','USER')"
+                                    data-bs-toggle="modal" data-bs-target="#modalFalta"
+                                    th:data-acao="@{/agendamentos/falta/{id}(id=${agendamento.id})}"
+                                    th:data-descricao="${descricao}"
+                                    th:disabled="${!agendamento.permiteRegistrarFalta(agora)}">Registrar falta</button>
                             <button type="button" class="btn btn-sm btn-outline-danger"
                                     data-bs-toggle="modal" data-bs-target="#modalCancelar"
                                     th:data-acao="@{/agendamentos/cancelar/{id}(id=${agendamento.id})}"
                                     th:data-descricao="${descricao}"
-                                    th:disabled="${!agendamento.agendado}">Cancelar</button>
+                                    th:disabled="${equipe ? !agendamento.agendado : !agendamento.permiteCancelamentoPeloPaciente(agora)}">Cancelar</button>
                         </div>
                     </td>
                 </tr>
@@ -154,6 +163,26 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Voltar</button>
                 <button type="submit" class="btn btn-primary">Confirmar presença</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalFalta" tabindex="-1" aria-labelledby="modalFaltaTitulo" aria-hidden="true"
+     data-confirmacao sec:authorize="hasAnyRole('ADMIN','USER')">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" method="post" th:action="@{/agendamentos/falta/0}">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="modalFaltaTitulo">Registrar falta</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-1">Registrar que o paciente não compareceu: <strong data-descricao></strong>?</p>
+                <p class="text-secondary mb-0">Nenhuma consulta é registrada e o agendamento não poderá mais ser alterado.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Voltar</button>
+                <button type="submit" class="btn btn-secondary">Registrar falta</button>
             </div>
         </form>
     </div>

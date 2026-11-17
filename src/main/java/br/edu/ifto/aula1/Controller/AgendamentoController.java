@@ -92,6 +92,7 @@ public class AgendamentoController {
         model.addAttribute("pacientes", pacienteService.listar());
         model.addAttribute("medicos", medicoService.listar());
         model.addAttribute("statusDisponiveis", StatusAgendamento.values());
+        model.addAttribute("agora", service.agora());
         return new ModelAndView("agendamento/lista", model);
     }
 
@@ -112,6 +113,14 @@ public class AgendamentoController {
     public ModelAndView confirmar(@PathVariable("id") Long id, RedirectAttributes attributes) {
         service.confirmarPresenca(id);
         attributes.addFlashAttribute("mensagem", "Presença confirmada. A consulta foi registrada.");
+        return new ModelAndView("redirect:/agendamentos/list");
+    }
+
+    /** O paciente não compareceu. Também só administração e recepção (SecurityConfiguration). */
+    @PostMapping("/falta/{id}")
+    public ModelAndView registrarFalta(@PathVariable("id") Long id, RedirectAttributes attributes) {
+        service.registrarFalta(id);
+        attributes.addFlashAttribute("mensagem", "Falta registrada.");
         return new ModelAndView("redirect:/agendamentos/list");
     }
 

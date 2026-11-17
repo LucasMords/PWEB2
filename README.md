@@ -39,17 +39,19 @@ Testes: `mvnw.cmd test`.
 | Entidade | O que e | Status |
 |---|---|---|
 | `Agenda` | Horario disponibilizado por um medico (medico, data, horario) | `DISPONIVEL`, `AGENDADO` |
-| `Agendamento` | Reserva de um horario por um paciente | `AGENDADO`, `REALIZADO`, `CANCELADO` |
+| `Agendamento` | Reserva de um horario por um paciente | `AGENDADO`, `REALIZADO`, `FALTOU`, `CANCELADO` |
 | `Consulta` | Atendimento realizado, criado na confirmacao de presenca | - |
 
 Fluxo:
 
 1. **Cadastro de horario** (`/agenda/form`): administracao e recepcao escolhem o medico; o medico cadastra apenas a propria agenda. Nao aceita data/hora no passado nem horario repetido para o mesmo medico.
+   - **Geracao em lote** (`/agenda/lote`): periodo de ate 92 dias, dias da semana, faixa de horario e duracao da consulta (10 a 240 min). Gera um horario por intervalo; a ultima consulta termina no maximo no horario final. Horarios que ja existem ou ja passaram sao ignorados, entao o mesmo lote pode ser gerado de novo. Tudo e gravado numa transacao, com limite de 1000 horarios por lote.
 2. **Horarios disponiveis** (`/agenda/list`): lista paginada dos horarios `DISPONIVEL` que ainda nao passaram, com filtros por medico, especialidade e data.
 3. **Agendamento** (`/agendamentos/novo/{agendaId}` e `POST /agendamentos/save`): cria o `Agendamento` (`AGENDADO`) e muda a `Agenda` para `AGENDADO` na mesma transacao. Nenhuma consulta e criada. O paciente agenda sempre para si (a conta autenticada decide, nao o formulario); a equipe escolhe o paciente.
-4. **Confirmacao de presenca** (`POST /agendamentos/confirmar/{id}`, so `ADMIN` e `USER`): cria a `Consulta` e muda o agendamento para `REALIZADO`, na mesma transacao. Uma segunda tentativa e rejeitada.
-5. **Cancelamento** (`POST /agendamentos/cancelar/{id}`): o agendamento vira `CANCELADO` (nao e excluido) e a agenda volta para `DISPONIVEL`. Um novo agendamento do mesmo horario cria outro registro. Agendamento `REALIZADO` nao pode ser cancelado. O paciente so cancela os proprios agendamentos.
-6. **Historico** (`/consultas/list`, `/usuario/consultas`, `/usuario/agendamentos`): consultas registradas e agendamentos de quem esta autenticado. Na consulta so as observacoes sao editaveis.
+4. **Confirmacao de presenca** (`POST /agendamentos/confirmar/{id}`, so `ADMIN` e `USER`): cria a `Consulta` e muda o agendamento para `REALIZADO`, na mesma transacao. So vale a partir de 1 hora antes do horario (`Agendamento.ANTECEDENCIA_CONFIRMACAO`). Uma segunda tentativa e rejeitada.
+5. **Falta** (`POST /agendamentos/falta/{id}`, so `ADMIN` e `USER`): depois do horario, marca o agendamento como `FALTOU`. Nenhuma consulta e criada e o horario, que ja passou, continua ocupado.
+6. **Cancelamento** (`POST /agendamentos/cancelar/{id}`): o agendamento vira `CANCELADO` (nao e excluido) e a agenda volta para `DISPONIVEL`. Um novo agendamento do mesmo horario cria outro registro. Agendamento `REALIZADO` ou `FALTOU` nao pode ser cancelado. O paciente so cancela os proprios agendamentos e so antes do horario; a equipe pode cancelar depois (ex.: o medico nao pode atender).
+7. **Historico** (`/consultas/list`, `/usuario/consultas`, `/usuario/agendamentos`): consultas registradas e agendamentos de quem esta autenticado. Na consulta so as observacoes sao editaveis.
 
 Integridade e concorrencia:
 
@@ -58,6 +60,8 @@ Integridade e concorrencia:
 - Cada escrita comeca lendo com bloqueio pessimista (`SELECT ... FOR UPDATE`, `@Lock(PESSIMISTIC_WRITE)`) o registro que decide a regra: a `Agenda` ao reservar, o `Agendamento` ao cancelar ou confirmar. Dois pacientes disputando o mesmo horario sao atendidos em fila e o segundo recebe "Este horario nao esta mais disponivel". As restricoes unicas ficam como segunda barreira.
 - As regras ficam nos servicos (`AgendaService`, `AgendamentoService`), que lancam `RegraNegocioException`. O `RegraNegocioAdvice` (`@ControllerAdvice`) transforma a excecao em mensagem de erro e redireciona para a listagem; no formulario de horario ela aparece no campo correspondente.
 - Medico com horarios na agenda e paciente com agendamentos nao podem ser excluidos, para preservar o historico.
+- As regras de horario leem a hora por um `java.time.Clock` (bean em `Config.RelogioConfig`), e nao por `LocalDateTime.now()` direto, para que os testes possam fixar o "agora". Na tela, os botoes de confirmar, registrar falta e cancelar so ficam habilitados quando a acao cabe no status e no horario; o servico confere tudo de novo.
+- O `import.sql` inclui um agendamento de ontem ainda pendente (Ana com o Dr. Eduardo), para demonstrar a confirmacao de presenca e o registro de falta.
 
 ## Spring Data JPA
 
