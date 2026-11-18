@@ -3,6 +3,7 @@ package br.edu.ifto.aula1.Model.repository;
 import br.edu.ifto.aula1.Model.Entity.Agendamento;
 import br.edu.ifto.aula1.Model.Entity.StatusAgendamento;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -12,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,6 +43,22 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
     List<Agendamento> buscarAtivosDoDia(@Param("data") LocalDate data,
                                         @Param("medicoId") Long medicoId,
                                         @Param("cancelado") StatusAgendamento cancelado);
+
+    /** Agendamentos do paciente com este status a partir de um instante, do mais próximo ao mais distante. */
+    @Query("""
+            select ag from Agendamento ag
+              join fetch ag.agenda a
+              join fetch a.medico
+            where ag.paciente.id = :pacienteId
+              and ag.status = :status
+              and (a.data > :data or (a.data = :data and a.horario >= :horario))
+            order by a.data, a.horario
+            """)
+    List<Agendamento> buscarProximosDoPaciente(@Param("pacienteId") Long pacienteId,
+                                               @Param("status") StatusAgendamento status,
+                                               @Param("data") LocalDate data,
+                                               @Param("horario") LocalTime horario,
+                                               Limit limite);
 
     /**
      * Lê o agendamento com bloqueio pessimista, para que cancelamento e confirmação de

@@ -21,7 +21,8 @@ FROM eclipse-temurin:25-jre
 WORKDIR /app
 
 # A aplicacao nao roda como root.
-RUN groupadd --system clinica && useradd --system --gid clinica clinica
+RUN groupadd --system clinica && useradd --system --gid clinica clinica \
+    && mkdir logs && chown clinica:clinica logs
 
 # Camadas do Spring Boot, da que menos muda (bibliotecas) para a que mais muda (classes).
 COPY --from=build /app/target/extraido/dependencies/ ./

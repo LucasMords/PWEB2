@@ -42,9 +42,15 @@ public class PacienteController {
         return new ModelAndView("paciente/formulario", model);
     }
 
+    private static final int TAMANHO_PAGINA = 10;
+
+    /** Lista paginada, com busca opcional por nome ou CPF. */
     @GetMapping("/list")
-    public ModelAndView listar(ModelMap model) {
-        model.addAttribute("pacientes", service.listar());
+    public ModelAndView listar(@RequestParam(name = "busca", required = false) String busca,
+                               @RequestParam(name = "page", defaultValue = "0") int page,
+                               ModelMap model) {
+        model.addAttribute("pagina", service.buscar(busca, page, TAMANHO_PAGINA));
+        model.addAttribute("busca", busca == null ? "" : busca.strip());
         return new ModelAndView("paciente/lista", model);
     }
 

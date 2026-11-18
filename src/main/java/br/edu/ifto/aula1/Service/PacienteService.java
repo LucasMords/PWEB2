@@ -6,6 +6,9 @@ import br.edu.ifto.aula1.Model.Entity.Perfil;
 import br.edu.ifto.aula1.Model.repository.AgendamentoRepository;
 import br.edu.ifto.aula1.Model.repository.PacienteRepository;
 import br.edu.ifto.aula1.Validation.Credenciais;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -35,8 +39,32 @@ public class PacienteService {
         this.clock = clock;
     }
 
+    private static final Sort POR_NOME = Sort.by("nome").and(Sort.by("id"));
+
+    /** Tamanho máximo do texto de busca; o excedente é descartado. */
+    public static final int BUSCA_MAXIMA = 100;
+
     public List<Paciente> listar() {
-        return repository.findAll(Sort.by("nome").and(Sort.by("id")));
+        return repository.findAll(POR_NOME);
+    }
+
+    /** Pacientes por nome ou CPF, em ordem alfabética. Busca vazia lista todos. */
+    public Page<Paciente> buscar(String texto, int pagina, int tamanho) {
+        Pageable pageable = PageRequest.of(Math.max(pagina, 0), tamanho, POR_NOME);
+        String termo = texto == null ? "" : texto.strip();
+        if (termo.length() > BUSCA_MAXIMA)
+            termo = termo.substring(0, BUSCA_MAXIMA);
+        if (termo.isEmpty())
+            return repository.findAll(pageable);
+
+        String digitos = termo.replaceAll("\\D", "");
+        return repository.buscar("%" + escaparLike(termo.toLowerCase(Locale.ROOT)) + "%",
+                digitos.isEmpty() ? null : "%" + digitos + "%", pageable);
+    }
+
+    /** O texto digitado é procurado literalmente: % e _ não funcionam como curingas. */
+    private static String escaparLike(String texto) {
+        return texto.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     public Paciente buscar(Long id) {

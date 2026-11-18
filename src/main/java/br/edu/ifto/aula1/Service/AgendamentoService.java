@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -81,6 +82,13 @@ public class AgendamentoService {
 
     public Page<Agendamento> listarPorMedico(Long medicoId, Pageable pageable) {
         return repository.buscar(null, medicoId, null, null, pageable);
+    }
+
+    /** O próximo agendamento ainda por acontecer do paciente, para o painel inicial. */
+    public Optional<Agendamento> proximoDoPaciente(Long pacienteId) {
+        LocalDateTime agora = agora();
+        return repository.buscarProximosDoPaciente(pacienteId, StatusAgendamento.AGENDADO,
+                agora.toLocalDate(), agora.toLocalTime(), Limit.of(1)).stream().findFirst();
     }
 
     /**

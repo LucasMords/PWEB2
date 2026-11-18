@@ -170,3 +170,10 @@ body {
 .coluna-horario {
     width: 6rem;
 }
+
+/* Painel inicial: os números do resumo do dia */
+.painel-numero {
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+}

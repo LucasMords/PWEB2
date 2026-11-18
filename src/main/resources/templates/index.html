@@ -14,6 +14,80 @@
 
     <div th:replace="~{fragments/layout :: erro}"></div>
 
+    <!-- Administração e atendimento: resumo de hoje, todos os médicos -->
+    <section class="card border-0 shadow-sm mb-4" th:if="${resumoDoDia != null}">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 class="h5 mb-0">Hoje, <span th:text="${#temporals.format(hoje, 'dd/MM/yyyy')}"></span></h2>
+                <a class="btn btn-sm btn-outline-primary" th:href="@{/agenda/dia}">Abrir a agenda do dia</a>
+            </div>
+            <div class="row g-3 text-center">
+                <div class="col-6 col-md">
+                    <div class="painel-numero" th:text="${resumoDoDia.horarios}">0</div>
+                    <div class="text-secondary small">horários</div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="painel-numero" th:text="${resumoDoDia.livres}">0</div>
+                    <div class="text-secondary small">livres</div>
+                </div>
+                <div class="col-4 col-md">
+                    <div class="painel-numero text-warning-emphasis" th:text="${resumoDoDia.aguardando}">0</div>
+                    <div class="text-secondary small">aguardando</div>
+                </div>
+                <div class="col-4 col-md">
+                    <div class="painel-numero text-success" th:text="${resumoDoDia.realizados}">0</div>
+                    <div class="text-secondary small">realizadas</div>
+                </div>
+                <div class="col-4 col-md">
+                    <div class="painel-numero text-secondary" th:text="${resumoDoDia.faltas}">0</div>
+                    <div class="text-secondary small">faltas</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Médico: os próprios horários de hoje -->
+    <section class="card border-0 shadow-sm mb-4" th:if="${agendaDoMedico != null}">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 class="h5 mb-0">Seus horários de hoje</h2>
+                <a class="btn btn-sm btn-outline-primary" th:href="@{/agenda/dia}">Abrir a agenda do dia</a>
+            </div>
+            <p class="text-secondary mb-0" th:if="${agendaDoMedico.vazia}">
+                Nenhum horário cadastrado para hoje. <a th:href="@{/agenda/lote}">Gerar horários</a></p>
+            <ul class="list-group list-group-flush" th:unless="${agendaDoMedico.vazia}">
+                <li class="list-group-item d-flex flex-wrap align-items-center gap-2 px-0"
+                    th:each="linha : ${agendaDoMedico.grupos[0].linhas}">
+                    <strong th:text="${#temporals.format(linha.agenda.horario, 'HH:mm')}">08:00</strong>
+                    <span class="text-secondary" th:if="${linha.livre}">Livre</span>
+                    <th:block th:unless="${linha.livre}">
+                        <span th:text="${linha.agendamento.paciente.nome}">Paciente</span>
+                        <span th:replace="~{fragments/layout :: statusAgendamento(${linha.agendamento.status})}"></span>
+                    </th:block>
+                </li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Paciente: o próximo agendamento -->
+    <section class="card border-0 shadow-sm mb-4" th:if="${pacienteDoPainel}">
+        <div class="card-body">
+            <h2 class="h5">Seu próximo agendamento</h2>
+            <p class="text-secondary mb-0" th:if="${proximoAgendamento == null}">
+                Você não tem consultas marcadas.</p>
+            <th:block th:if="${proximoAgendamento != null}" th:with="agenda=${proximoAgendamento.agenda}">
+                <p class="fs-5 mb-1">
+                    <span th:text="${#temporals.format(agenda.data, 'dd/MM/yyyy')}">01/01/2030</span>
+                    às <span th:text="${#temporals.format(agenda.horario, 'HH:mm')}">08:00</span>
+                </p>
+                <p class="text-secondary mb-0">
+                    <span th:text="${agenda.medico.nome}">Médico</span> &middot;
+                    <span th:text="${agenda.medico.especialidade}">Especialidade</span>
+                </p>
+            </th:block>
+        </div>
+    </section>
+
     <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-primary" th:href="@{/agenda/list}" sec:authorize="hasRole('ATENDENTE')">Agendar horário</a>
         <a class="btn btn-outline-secondary" th:href="@{/agenda/form}"

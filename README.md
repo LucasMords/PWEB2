@@ -35,7 +35,9 @@ docker compose up --build
 
 A imagem ativa o perfil `prod` (`application-prod.properties`): sem SQL no log, sem
 console H2, cache de templates ligado, logs em JSON (formato ECS, uma linha por evento) e
-cookie de sessao `Secure`. O HTTPS fica num proxy reverso na frente da aplicacao; os
+cookie de sessao `Secure`. Os logs tambem vao para `logs/clinica.log` (JSON, com rotacao
+a cada 10 MB ou por dia, guardados por 14 dias e ate 500 MB no total; o caminho muda com a
+variavel `LOG_ARQUIVO`); no Compose, a pasta e um volume. O HTTPS fica num proxy reverso na frente da aplicacao; os
 cabecalhos `X-Forwarded-*` sao respeitados. O banco ainda e o H2 em memoria, entao os
 dados se perdem quando o container reinicia.
 
@@ -51,6 +53,19 @@ publicado.
 
 **Erros.** Erros inesperados mostram uma pagina generica (`templates/error/5xx.html`);
 o detalhe tecnico fica so no log.
+
+## Painel inicial e busca de pacientes
+
+A pagina inicial mostra um painel conforme o perfil, so com dados que o perfil ja pode ver:
+
+- administracao e atendimento: o resumo de hoje de todos os medicos (horarios, livres,
+  aguardando, realizadas e faltas), com atalho para a agenda do dia;
+- medico: os proprios horarios de hoje, com o paciente e a situacao de cada um;
+- paciente: o proximo agendamento (data, hora, medico e especialidade).
+
+A lista de pacientes e paginada (10 por pagina, em ordem alfabetica) e tem busca por parte
+do nome, sem diferenciar maiusculas, ou pelos digitos do CPF, com ou sem pontuacao. O
+texto e procurado literalmente: `%` e `_` nao funcionam como curingas.
 
 ## Camadas
 
