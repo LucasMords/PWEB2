@@ -71,12 +71,12 @@ texto e procurado literalmente: `%` e `_` nao funcionam como curingas.
 
 | Pacote | Papel |
 |---|---|
-| `Controller` | Recebe a requisicao, valida o formulario (`@Valid`, `BindingResult`), chama o servico e redireciona |
-| `Service` | Regras e transacoes; unico ponto que acessa os repositorios |
-| `Model.repository` | Interfaces Spring Data JPA |
-| `Model.Entity` | Entidades JPA com as restricoes de validacao |
-| `Dto` | Objetos dos formularios e dos filtros da agenda (`AgendaForm`, `AgendamentoForm`, `AgendaFiltro`...) |
-| `Validation` | Credenciais do cadastro (`Credenciais`, `CredenciaisValidator`) |
+| `controller` | Recebe a requisicao, valida o formulario (`@Valid`, `BindingResult`), chama o servico e redireciona |
+| `service` | Regras e transacoes; unico ponto que acessa os repositorios |
+| `model.repository` | Interfaces Spring Data JPA |
+| `model.entity` | Entidades JPA com as restricoes de validacao |
+| `dto` | Objetos dos formularios e dos filtros da agenda (`AgendaForm`, `AgendamentoForm`, `AgendaFiltro`...) |
+| `validation` | Credenciais do cadastro (`Credenciais`, `CredenciaisValidator`) |
 
 ## Agenda, agendamentos e consultas
 

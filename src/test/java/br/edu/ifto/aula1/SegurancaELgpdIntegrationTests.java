@@ -1,20 +1,20 @@
 package br.edu.ifto.aula1;
 
-import br.edu.ifto.aula1.Model.Entity.AcaoAuditoria;
-import br.edu.ifto.aula1.Model.Entity.Agenda;
-import br.edu.ifto.aula1.Model.Entity.Agendamento;
-import br.edu.ifto.aula1.Model.Entity.Paciente;
-import br.edu.ifto.aula1.Model.Entity.RegistroAuditoria;
-import br.edu.ifto.aula1.Model.Entity.Usuario;
-import br.edu.ifto.aula1.Model.repository.AgendamentoRepository;
-import br.edu.ifto.aula1.Model.repository.MedicoRepository;
-import br.edu.ifto.aula1.Model.repository.PacienteRepository;
-import br.edu.ifto.aula1.Model.repository.RegistroAuditoriaRepository;
-import br.edu.ifto.aula1.Model.repository.UsuarioRepository;
-import br.edu.ifto.aula1.Security.TentativasLoginService;
-import br.edu.ifto.aula1.Service.AgendaService;
-import br.edu.ifto.aula1.Service.PacienteService;
-import br.edu.ifto.aula1.Validation.Credenciais;
+import br.edu.ifto.aula1.model.entity.AcaoAuditoria;
+import br.edu.ifto.aula1.model.entity.Agenda;
+import br.edu.ifto.aula1.model.entity.Agendamento;
+import br.edu.ifto.aula1.model.entity.Paciente;
+import br.edu.ifto.aula1.model.entity.RegistroAuditoria;
+import br.edu.ifto.aula1.model.entity.Usuario;
+import br.edu.ifto.aula1.model.repository.AgendamentoRepository;
+import br.edu.ifto.aula1.model.repository.MedicoRepository;
+import br.edu.ifto.aula1.model.repository.PacienteRepository;
+import br.edu.ifto.aula1.model.repository.RegistroAuditoriaRepository;
+import br.edu.ifto.aula1.model.repository.UsuarioRepository;
+import br.edu.ifto.aula1.security.TentativasLoginService;
+import br.edu.ifto.aula1.service.AgendaService;
+import br.edu.ifto.aula1.service.PacienteService;
+import br.edu.ifto.aula1.validation.Credenciais;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -267,7 +267,7 @@ class SegurancaELgpdIntegrationTests {
     }
 
     private Agenda novoHorario() {
-        var form = new br.edu.ifto.aula1.Dto.AgendaForm();
+        var form = new br.edu.ifto.aula1.dto.AgendaForm();
         form.setMedicoId(medicos.findByUsuarioLogin("beatriz.rocha").orElseThrow().getId());
         form.setData(LocalDate.now().plusYears(3).plusDays(SEQUENCIA.incrementAndGet()));
         form.setHorario(LocalTime.of(9, 0));
