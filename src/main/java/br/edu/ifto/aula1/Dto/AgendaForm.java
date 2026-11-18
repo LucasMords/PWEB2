@@ -13,8 +13,8 @@ import java.time.LocalTime;
  */
 public class AgendaForm {
 
-    // Sem @NotNull: quando quem cadastra é o próprio médico, o id não vem do formulário,
-    // e sim da conta autenticada (AgendaController). A obrigatoriedade é conferida lá e no serviço.
+    // Sem @NotNull: só o próprio médico cadastra horários, e o id não vem do formulário,
+    // e sim da conta autenticada (AgendaController). O serviço confere que ele existe.
     private Long medicoId;
 
     @NotNull(message = "Informe a data.")

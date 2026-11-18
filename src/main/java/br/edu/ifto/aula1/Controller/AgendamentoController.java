@@ -4,9 +4,7 @@ import br.edu.ifto.aula1.Dto.AgendaFiltro;
 import br.edu.ifto.aula1.Dto.AgendamentoFiltro;
 import br.edu.ifto.aula1.Dto.AgendamentoForm;
 import br.edu.ifto.aula1.Model.Entity.Agendamento;
-import br.edu.ifto.aula1.Model.Entity.Paciente;
 import br.edu.ifto.aula1.Model.Entity.StatusAgendamento;
-import br.edu.ifto.aula1.Security.Papeis;
 import br.edu.ifto.aula1.Service.AgendaService;
 import br.edu.ifto.aula1.Service.AgendamentoService;
 import br.edu.ifto.aula1.Service.MedicoService;
@@ -14,7 +12,6 @@ import br.edu.ifto.aula1.Service.PacienteService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -31,15 +28,18 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.time.format.DateTimeFormatter;
 
 /**
- * Agendamentos: reserva de um horário, gerenciamento, cancelamento e confirmação de presença.
- * As regras ficam no AgendamentoService; as RegraNegocioException que ele lança viram
- * mensagem de erro e redirecionamento no RegraNegocioAdvice.
+ * Agendamentos: reserva de um horário, gerenciamento, cancelamento, reagendamento,
+ * confirmação de presença e registro de falta. Quem marca é o atendente, que escolhe o
+ * paciente (SecurityConfiguration); o paciente só consulta os próprios agendamentos em
+ * /usuario/agendamentos. As regras ficam no AgendamentoService; as RegraNegocioException
+ * que ele lança viram mensagem de erro e redirecionamento no RegraNegocioAdvice.
  */
 @Controller
 @RequestMapping("agendamentos")
 public class AgendamentoController {
 
     static final int TAMANHO_PAGINA = 10;
+    private static final String LISTA = "/agendamentos/list";
 
     private final AgendamentoService service;
     private final AgendaService agendaService;
@@ -54,36 +54,32 @@ public class AgendamentoController {
         this.medicoService = medicoService;
     }
 
-    /** Tela de confirmação: mostra o horário escolhido antes de concluir o agendamento. */
+    /** Tela de confirmação: mostra o horário escolhido e pede o paciente antes de concluir. */
     @GetMapping("/novo/{agendaId}")
-    public ModelAndView novo(@PathVariable("agendaId") Long agendaId, Authentication autenticacao, ModelMap model) {
+    public ModelAndView novo(@PathVariable("agendaId") Long agendaId, ModelMap model) {
         AgendamentoForm form = new AgendamentoForm();
         form.setAgendaId(agendaId);
         model.addAttribute("form", form);
-        return confirmacao(agendaId, autenticacao, model);
+        return confirmacao(agendaId, model);
     }
 
     @PostMapping("/save")
     public ModelAndView save(@Valid @ModelAttribute("form") AgendamentoForm form, BindingResult result,
-                             Authentication autenticacao, ModelMap model, RedirectAttributes attributes) {
-        boolean equipe = Papeis.daEquipe(autenticacao);
-
-        // O paciente agenda sempre para si: o pacienteId da requisição só vale para a equipe.
-        Long pacienteId = equipe ? form.getPacienteId() : pacienteAutenticado(autenticacao).getId();
-
-        if (equipe && !result.hasFieldErrors("pacienteId")) {
+                             ModelMap model, RedirectAttributes attributes) {
+        Long pacienteId = form.getPacienteId();
+        if (!result.hasFieldErrors("pacienteId")) {
             if (pacienteId == null)
                 result.rejectValue("pacienteId", "NotNull", "Selecione o paciente.");
             else if (!pacienteService.existe(pacienteId))
                 result.rejectValue("pacienteId", "NotFound", "Paciente não encontrado.");
         }
         if (result.hasErrors())
-            return confirmacao(form.getAgendaId(), autenticacao, model);
+            return confirmacao(form.getAgendaId(), model);
 
         service.agendar(form.getAgendaId(), pacienteId);
 
         attributes.addFlashAttribute("mensagem", "Agendamento realizado com sucesso.");
-        return new ModelAndView("redirect:" + listaDe(autenticacao));
+        return new ModelAndView("redirect:" + LISTA);
     }
 
     /** Gerenciamento: todos os agendamentos, com filtros. Filtro inválido é tratado como vazio. */
@@ -92,7 +88,7 @@ public class AgendamentoController {
                                @RequestParam(name = "page", defaultValue = "0") int page,
                                ModelMap model) {
         model.addAttribute("titulo", "Agendamentos");
-        model.addAttribute("urlLista", "/agendamentos/list");
+        model.addAttribute("urlLista", LISTA);
         model.addAttribute("pagina", service.listar(filtro, PageRequest.of(Math.max(page, 0), TAMANHO_PAGINA)));
         model.addAttribute("pacientes", pacienteService.listar());
         model.addAttribute("medicos", medicoService.listar());
@@ -107,47 +103,43 @@ public class AgendamentoController {
                                  @RequestParam(name = "motivo", required = false) String motivo,
                                  Authentication autenticacao, HttpServletRequest request,
                                  RedirectAttributes attributes) {
-        service.cancelar(id, pacienteRestrito(autenticacao), autenticacao.getName(), motivo);
+        service.cancelar(id, autenticacao.getName(), motivo);
 
         attributes.addFlashAttribute("mensagem", "Agendamento cancelado. O horário voltou a ficar disponível.");
-        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse(listaDe(autenticacao)));
+        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse(LISTA));
     }
 
-    /** Só administração e recepção chegam aqui (SecurityConfiguration). */
     @PostMapping("/confirmar/{id}")
     public ModelAndView confirmar(@PathVariable("id") Long id, HttpServletRequest request,
                                   RedirectAttributes attributes) {
         service.confirmarPresenca(id);
         attributes.addFlashAttribute("mensagem", "Presença confirmada. A consulta foi registrada.");
-        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse("/agendamentos/list"));
+        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse(LISTA));
     }
 
-    /** O paciente não compareceu. Também só administração e recepção (SecurityConfiguration). */
+    /** O paciente não compareceu. */
     @PostMapping("/falta/{id}")
     public ModelAndView registrarFalta(@PathVariable("id") Long id, HttpServletRequest request,
                                        RedirectAttributes attributes) {
         service.registrarFalta(id);
         attributes.addFlashAttribute("mensagem", "Falta registrada.");
-        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse("/agendamentos/list"));
+        return new ModelAndView("redirect:" + Retorno.agendaDoDia(request).orElse(LISTA));
     }
 
-    /**
-     * Tela de reagendamento: o agendamento atual e os horários livres do mesmo médico.
-     * O paciente só chega aqui com o próprio agendamento e dentro do prazo.
-     */
+    /** Tela de reagendamento: o agendamento atual e os horários livres do mesmo médico. */
     @GetMapping("/reagendar/{id}")
     public ModelAndView reagendar(@PathVariable("id") Long id,
                                   @ModelAttribute("filtro") AgendaFiltro filtro, BindingResult result,
                                   @RequestParam(name = "page", defaultValue = "0") int page,
-                                  Authentication autenticacao, ModelMap model) {
-        Agendamento agendamento = service.buscarParaReagendar(id, pacienteRestrito(autenticacao));
+                                  ModelMap model) {
+        Agendamento agendamento = service.buscarParaReagendar(id);
 
         // Só horários do mesmo médico: trocar de médico é cancelar e agendar de novo.
         filtro.setMedicoId(agendamento.getAgenda().getMedico().getId());
         filtro.setEspecialidade(null);
 
         model.addAttribute("agendamento", agendamento);
-        model.addAttribute("voltar", listaDe(autenticacao));
+        model.addAttribute("voltar", LISTA);
         model.addAttribute("pagina", agendaService.listarDisponiveis(filtro, PageRequest.of(Math.max(page, 0), TAMANHO_PAGINA)));
         return new ModelAndView("agendamento/reagendar", model);
     }
@@ -156,36 +148,17 @@ public class AgendamentoController {
     public ModelAndView confirmarReagendamento(@PathVariable("id") Long id,
                                                @RequestParam(name = "agendaId", required = false) Long agendaId,
                                                Authentication autenticacao, RedirectAttributes attributes) {
-        Agendamento novo = service.reagendar(id, agendaId, pacienteRestrito(autenticacao), autenticacao.getName());
+        Agendamento novo = service.reagendar(id, agendaId, autenticacao.getName());
 
         attributes.addFlashAttribute("mensagem", "Agendamento remarcado para "
                 + novo.getAgenda().getData().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                 + " às " + novo.getAgenda().getHorario().format(DateTimeFormatter.ofPattern("HH:mm")) + ".");
-        return new ModelAndView("redirect:" + listaDe(autenticacao));
+        return new ModelAndView("redirect:" + LISTA);
     }
 
-    /** null para a equipe (age em nome de qualquer paciente); o id do paciente da conta, para o paciente. */
-    private Long pacienteRestrito(Authentication autenticacao) {
-        return Papeis.daEquipe(autenticacao) ? null : pacienteAutenticado(autenticacao).getId();
-    }
-
-    private ModelAndView confirmacao(Long agendaId, Authentication autenticacao, ModelMap model) {
+    private ModelAndView confirmacao(Long agendaId, ModelMap model) {
         model.addAttribute("agenda", agendaService.buscarDisponivel(agendaId));
-        if (Papeis.daEquipe(autenticacao))
-            model.addAttribute("pacientes", pacienteService.listar());
-        else
-            model.addAttribute("pacienteAutenticado", pacienteAutenticado(autenticacao));
-
+        model.addAttribute("pacientes", pacienteService.listar());
         return new ModelAndView("agendamento/confirmacao", model);
-    }
-
-    private Paciente pacienteAutenticado(Authentication autenticacao) {
-        return pacienteService.buscarPorLogin(autenticacao.getName())
-                .orElseThrow(() -> new AccessDeniedException("Conta sem paciente vinculado."));
-    }
-
-    /** A equipe volta para o gerenciamento; o paciente, para os próprios agendamentos. */
-    static String listaDe(Authentication autenticacao) {
-        return Papeis.daEquipe(autenticacao) ? "/agendamentos/list" : "/usuario/agendamentos";
     }
 }

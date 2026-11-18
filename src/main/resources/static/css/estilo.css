@@ -165,3 +165,8 @@ body {
     --bs-pagination-focus-color: var(--clinica-verde-escuro);
     --bs-pagination-focus-box-shadow: 0 0 0 0.25rem rgba(18, 107, 91, 0.25);
 }
+
+/* Agenda do dia: coluna do horário com largura fixa */
+.coluna-horario {
+    width: 6rem;
+}

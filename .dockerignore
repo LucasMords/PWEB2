@@ -1,0 +1,10 @@
+# Fica fora do contexto do docker build: a imagem compila a partir do codigo-fonte.
+target/
+.git/
+.github/
+.idea/
+.vscode/
+.claude/
+*.iml
+Dockerfile
+docker-compose.yml

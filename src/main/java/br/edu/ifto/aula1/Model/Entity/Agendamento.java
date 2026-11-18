@@ -34,9 +34,6 @@ public class Agendamento {
     /** Com quanta antecedência ao horário a presença já pode ser confirmada. */
     public static final Duration ANTECEDENCIA_CONFIRMACAO = Duration.ofHours(1);
 
-    /** Até quanto tempo antes do horário o próprio paciente pode cancelar ou reagendar. */
-    public static final Duration PRAZO_CANCELAMENTO_PACIENTE = Duration.ofHours(24);
-
     /** Tamanho máximo do motivo do cancelamento. */
     public static final int MOTIVO_MAXIMO = 255;
 
@@ -91,7 +88,7 @@ public class Agendamento {
     // mesmo instante (e para que os testes possam fixá-lo). O AgendamentoService as confere
     // de novo antes de gravar; na tela elas só habilitam ou desabilitam os botões.
 
-    /** A recepção confirma a presença a partir de 1 hora antes do horário (o paciente chega antes). */
+    /** O atendimento confirma a presença a partir de 1 hora antes do horário (o paciente chega antes). */
     public boolean permiteConfirmarPresenca(LocalDateTime agora) {
         return isAgendado() && !agora.isBefore(agenda.getDataHora().minus(ANTECEDENCIA_CONFIRMACAO));
     }
@@ -99,14 +96,6 @@ public class Agendamento {
     /** A falta só pode ser registrada depois que o horário começou. */
     public boolean permiteRegistrarFalta(LocalDateTime agora) {
         return isAgendado() && !agora.isBefore(agenda.getDataHora());
-    }
-
-    /**
-     * O paciente cancela ou reagenda sozinho até 24 horas antes do horário. Depois disso,
-     * só pela clínica, que pode cancelar a qualquer momento.
-     */
-    public boolean permiteCancelamentoPeloPaciente(LocalDateTime agora) {
-        return isAgendado() && agora.isBefore(agenda.getDataHora().minus(PRAZO_CANCELAMENTO_PACIENTE));
     }
 
     // As transições abaixo são chamadas pelo AgendamentoService, que confere antes

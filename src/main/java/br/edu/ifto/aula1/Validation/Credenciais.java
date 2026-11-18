@@ -18,6 +18,7 @@ public class Credenciais {
 
     @NotBlank(message = "Informe a senha.")
     @Size(min = 8, max = 72, message = "A senha deve ter de {min} a {max} caracteres.")
+    @Pattern(regexp = "(?=.*\\p{L})(?=.*\\d).*", message = "A senha deve ter letras e números.")
     private String senha;
 
     public String getLogin() {

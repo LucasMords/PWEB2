@@ -1,6 +1,6 @@
 -- Perfis (sem o prefixo ROLE_). O InitialUsersInitializer so cria os que faltarem.
 INSERT INTO perfis (nome) VALUES ('ADMIN');
-INSERT INTO perfis (nome) VALUES ('USER');
+INSERT INTO perfis (nome) VALUES ('ATENDENTE');
 INSERT INTO perfis (nome) VALUES ('MEDICO');
 INSERT INTO perfis (nome) VALUES ('PACIENTE');
 
@@ -18,9 +18,9 @@ INSERT INTO usuario_perfil (usuario_id, perfil_id) SELECT u.id, p.id FROM usuari
 INSERT INTO usuario_perfil (usuario_id, perfil_id) SELECT u.id, p.id FROM usuarios u, perfis p WHERE p.nome = 'MEDICO' AND u.login IN ('beatriz.rocha', 'eduardo.melo');
 
 -- Cada paciente e cada medico aponta para a sua conta em usuario_id.
-INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email, usuario_id) VALUES ('Ana Souza', '529.982.247-25', '1992-05-14', '(63) 99999-1001', 'ana@email.com', (SELECT id FROM usuarios WHERE login = 'ana.souza'));
-INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email, usuario_id) VALUES ('Carlos Lima', '123.456.789-09', '1985-09-22', '(63) 99999-1002', 'carlos@email.com', (SELECT id FROM usuarios WHERE login = 'carlos.lima'));
-INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email, usuario_id) VALUES ('Mariana Alves', '987.654.321-00', '2000-01-10', '(63) 99999-1003', 'mariana@email.com', (SELECT id FROM usuarios WHERE login = 'mariana.alves'));
+INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email, consentimento_em, usuario_id) VALUES ('Ana Souza', '529.982.247-25', '1992-05-14', '(63) 99999-1001', 'ana@email.com', '2026-08-01 09:00:00', (SELECT id FROM usuarios WHERE login = 'ana.souza'));
+INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email, consentimento_em, usuario_id) VALUES ('Carlos Lima', '123.456.789-09', '1985-09-22', '(63) 99999-1002', 'carlos@email.com', '2026-08-01 09:00:00', (SELECT id FROM usuarios WHERE login = 'carlos.lima'));
+INSERT INTO pacientes (nome, cpf, data_nascimento, telefone, email, consentimento_em, usuario_id) VALUES ('Mariana Alves', '987.654.321-00', '2000-01-10', '(63) 99999-1003', 'mariana@email.com', '2026-08-01 09:00:00', (SELECT id FROM usuarios WHERE login = 'mariana.alves'));
 
 INSERT INTO medicos (nome, crm, especialidade, telefone, email, usuario_id) VALUES ('Dra. Beatriz Rocha', 'CRM-TO 1001', 'Cardiologia', '(63) 99999-2001', 'beatriz@clinica.com', (SELECT id FROM usuarios WHERE login = 'beatriz.rocha'));
 INSERT INTO medicos (nome, crm, especialidade, telefone, email, usuario_id) VALUES ('Dr. Eduardo Melo', 'CRM-TO 1002', 'Clinica Geral', '(63) 99999-2002', 'eduardo@clinica.com', (SELECT id FROM usuarios WHERE login = 'eduardo.melo'));

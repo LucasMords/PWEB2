@@ -19,6 +19,7 @@ import org.hibernate.validator.constraints.br.CPF;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "pacientes")
@@ -62,8 +63,21 @@ public class Paciente {
     @JoinColumn(name = "usuario_id", unique = true)
     private Usuario usuario;
 
+    // LGPD: quando o paciente (ou a recepção, em nome dele) aceitou a política de privacidade.
+    // Sem setter, pelo mesmo motivo da conta: o formulário não preenche; o serviço registra.
+    @Column(name = "consentimento_em")
+    private LocalDateTime consentimentoEm;
+
     public void vincularUsuario(Usuario usuario) {
         this.usuario = usuario;
+    }
+
+    public void registrarConsentimento(LocalDateTime quando) {
+        this.consentimentoEm = quando;
+    }
+
+    public LocalDateTime getConsentimentoEm() {
+        return consentimentoEm;
     }
 
     public Long getId() {

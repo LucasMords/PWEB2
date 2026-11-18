@@ -18,7 +18,7 @@ public class Perfil {
 
     // Nomes gravados no banco, sem o prefixo ROLE_ (o Spring Security o acrescenta).
     public static final String ADMIN = "ADMIN";       // administração da clínica
-    public static final String USER = "USER";         // recepção
+    public static final String ATENDENTE = "ATENDENTE"; // secretaria/recepção: marca as consultas
     public static final String MEDICO = "MEDICO";     // conta institucional criada pelo ADMIN
     public static final String PACIENTE = "PACIENTE"; // papel inicial de quem se cadastra sozinho
 

@@ -25,21 +25,7 @@
                 <div class="alert alert-danger" role="alert" th:each="erroGlobal : ${#fields.globalErrors()}"
                      th:text="${erroGlobal}"></div>
 
-                <!-- Administração e recepção escolhem o médico -->
-                <div class="mb-3" th:if="${medicoAutenticado == null}">
-                    <label class="form-label" for="medicoId">Médico</label>
-                    <select class="form-select" th:field="*{medicoId}" th:errorclass="is-invalid">
-                        <option value="">Selecione</option>
-                        <option th:each="medico : ${medicos}"
-                                th:value="${medico.id}"
-                                th:text="${medico.nome + ' - ' + medico.especialidade}">
-                        </option>
-                    </select>
-                    <div class="invalid-feedback" th:errors="*{medicoId}"></div>
-                </div>
-
-                <!-- O médico cadastra apenas a própria agenda: o servidor usa a conta autenticada -->
-                <div class="mb-3" th:if="${medicoAutenticado != null}">
+                <div class="mb-3">
                     <label class="form-label" for="medicoNome">Médico</label>
                     <input type="text" class="form-control" id="medicoNome" readonly disabled
                            th:value="${medicoAutenticado.nome + ' - ' + medicoAutenticado.especialidade}">

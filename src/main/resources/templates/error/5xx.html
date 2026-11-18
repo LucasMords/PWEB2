@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<!-- O Spring Boot usa este template para qualquer erro 5xx. O detalhe técnico fica só no log. -->
+<head th:replace="~{fragments/layout :: head('Erro')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <h1 class="display-6">Não foi possível concluir a operação</h1>
+            <p class="text-secondary mb-4">Ocorreu um erro inesperado. Tente novamente em alguns instantes; se persistir, avise a administração da clínica.</p>
+            <a class="btn btn-primary" th:href="@{/}">Voltar ao início</a>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

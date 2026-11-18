@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cadastra os usuários da equipe (admin e recepção) ao subir a aplicação.
+ * Cadastra os usuários da equipe (admin e atendente) ao subir a aplicação.
  * O banco H2 é recriado a cada execução, por isso o cadastro roda sempre.
  * Os perfis são gravados sem o prefixo ROLE_ e as senhas como hash BCrypt.
  *
@@ -36,14 +36,15 @@ public class InitialUsersInitializer implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         Perfil admin = criarPerfil(Perfil.ADMIN);
-        Perfil user = criarPerfil(Perfil.USER);
+        Perfil atendente = criarPerfil(Perfil.ATENDENTE);
         // Papéis iniciais das contas criadas nos cadastros de médico e de paciente.
         // Já vêm do import.sql; ficam garantidos aqui caso ele mude.
         criarPerfil(Perfil.MEDICO);
         criarPerfil(Perfil.PACIENTE);
 
-        criarUsuario("admin", "Admin123", admin, user);
-        criarUsuario("user", "User123", user);
+        // A administração também atende: marca, cancela e confirma agendamentos.
+        criarUsuario("admin", "Admin123", admin, atendente);
+        criarUsuario("atendente", "Atendente123", atendente);
     }
 
     private Perfil criarPerfil(String nome) {

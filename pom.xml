@@ -81,6 +81,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!-- /actuator/health: verificação de saúde usada pelo Docker e por balanceadores -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
 		<!-- sec:authorize e sec:authentication nos templates -->
 		<dependency>
 			<groupId>org.thymeleaf.extras</groupId>

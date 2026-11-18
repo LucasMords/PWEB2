@@ -6,6 +6,7 @@ import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 /**
  * Regras das credenciais que as anotações não cobrem: login único e o limite do BCrypt.
@@ -38,5 +39,10 @@ public class CredenciaisValidator implements Validator {
         if (!erros.hasFieldErrors("senha")
                 && credenciais.getSenha().getBytes(StandardCharsets.UTF_8).length > LIMITE_BCRYPT_EM_BYTES)
             erros.rejectValue("senha", "Longa", "A senha é longa demais.");
+
+        // Senha que contém o próprio usuário é a primeira que alguém tentaria.
+        if (!erros.hasFieldErrors("senha") && credenciais.getLogin() != null
+                && credenciais.getSenha().toLowerCase(Locale.ROOT).contains(credenciais.getLogin().toLowerCase(Locale.ROOT)))
+            erros.rejectValue("senha", "ContemLogin", "A senha não pode conter o nome de usuário.");
     }
 }

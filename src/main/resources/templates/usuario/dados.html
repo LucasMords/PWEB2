@@ -35,6 +35,25 @@
             </dl>
         </div>
     </div>
+
+    <!-- LGPD: direitos do titular. Só para contas de paciente. -->
+    <section class="card border-0 shadow-sm mt-3" th:if="${paciente != null}">
+        <div class="card-body">
+            <h2 class="h6">Seus dados e a LGPD</h2>
+            <p class="mb-2">
+                Você pode baixar uma cópia de tudo o que a clínica guarda sobre você: cadastro,
+                agendamentos e consultas.
+                <th:block th:if="${paciente.consentimentoEm != null}">
+                    Você aceitou a política de privacidade em
+                    <span th:text="${#temporals.format(paciente.consentimentoEm, 'dd/MM/yyyy HH:mm')}"></span>.
+                </th:block>
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary" th:href="@{/usuario/dados/exportar}">Baixar meus dados (JSON)</a>
+                <a class="btn btn-outline-secondary" th:href="@{/privacidade}">Política de privacidade</a>
+            </div>
+        </div>
+    </section>
 </main>
 
 </body>

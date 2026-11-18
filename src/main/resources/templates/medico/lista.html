@@ -42,7 +42,7 @@
                             <!-- Exclusão por POST: o th:action inclui o token CSRF -->
                             <form class="m-0" method="post" sec:authorize="hasRole('ADMIN')"
                                   th:action="@{/medicos/remove/{id}(id=${medico.id})}"
-                                  onsubmit="return confirm('Excluir este médico?')">
+                                  data-confirmar="Excluir este médico?">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Excluir</button>
                             </form>
                         </div>
@@ -53,6 +53,8 @@
         </div>
     </div>
 </main>
+
+<script th:src="@{/js/confirmar.js}"></script>
 
 </body>
 </html>

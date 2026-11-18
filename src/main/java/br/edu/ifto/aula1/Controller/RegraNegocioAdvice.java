@@ -1,6 +1,5 @@
 package br.edu.ifto.aula1.Controller;
 
-import br.edu.ifto.aula1.Model.Entity.Perfil;
 import br.edu.ifto.aula1.Service.RegraNegocioException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -45,7 +44,7 @@ public class RegraNegocioAdvice {
         if (caminho.startsWith("/agendamentos/novo") || caminho.startsWith("/agendamentos/save"))
             return "/agenda/list";
         if (caminho.startsWith("/agendamentos"))
-            return daEquipe(request) ? "/agendamentos/list" : "/usuario/agendamentos";
+            return "/agendamentos/list";
         if (caminho.startsWith("/agenda"))
             return "/agenda/list";
         if (caminho.startsWith("/medicos"))
@@ -55,10 +54,5 @@ public class RegraNegocioAdvice {
         if (caminho.startsWith("/consultas"))
             return "/consultas/list";
         return "/";
-    }
-
-    private static boolean daEquipe(HttpServletRequest request) {
-        return request.isUserInRole(Perfil.ADMIN) || request.isUserInRole(Perfil.USER)
-                || request.isUserInRole(Perfil.MEDICO);
     }
 }

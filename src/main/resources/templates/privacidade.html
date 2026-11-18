@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('Política de privacidade')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<!-- Modelo de política para o sistema. Antes do uso real, a clínica deve revisar o texto
+     com o jurídico e preencher os dados do controlador e do encarregado (DPO). -->
+<main class="container">
+    <div class="row">
+        <div class="col-lg-9">
+            <h1 class="h3 mb-3">Política de privacidade</h1>
+
+            <p>
+                Esta política explica como a Clínica IFTO trata os dados pessoais de pacientes neste sistema,
+                conforme a Lei Geral de Proteção de Dados (Lei nº 13.709/2018, LGPD).
+            </p>
+
+            <h2 class="h5 mt-4">Quais dados coletamos</h2>
+            <ul>
+                <li><strong>Cadastro:</strong> nome, CPF, data de nascimento, telefone e e-mail.</li>
+                <li><strong>Conta de acesso:</strong> usuário e senha (guardada apenas como hash, nunca em texto).</li>
+                <li><strong>Atendimento:</strong> agendamentos, comparecimentos, faltas, cancelamentos e as
+                    observações registradas nas consultas. Estes são <strong>dados de saúde</strong>, considerados
+                    sensíveis pela LGPD.</li>
+                <li><strong>Registro de uso:</strong> quem fez cada operação no sistema e quando (auditoria),
+                    para segurança e prestação de contas.</li>
+            </ul>
+
+            <h2 class="h5 mt-4">Para que usamos</h2>
+            <ul>
+                <li>Agendar, remarcar e realizar o atendimento médico.</li>
+                <li>Manter o histórico de atendimentos exigido para a continuidade do cuidado.</li>
+                <li>Proteger as contas e investigar acessos indevidos.</li>
+            </ul>
+            <p>
+                Os dados de saúde são tratados para a tutela da saúde, em procedimento realizado por
+                profissionais de saúde (LGPD, art. 11, II, "f"), e os demais para a execução do serviço
+                que você contratou (art. 7º, V). Não usamos seus dados para publicidade e não os vendemos.
+            </p>
+
+            <h2 class="h5 mt-4">Com quem compartilhamos</h2>
+            <p>
+                Só a equipe da clínica (recepção, médicos e administração) acessa seus dados, cada um no que precisa
+                para a sua função. Não há compartilhamento com terceiros, salvo obrigação legal ou ordem judicial.
+            </p>
+
+            <h2 class="h5 mt-4">Por quanto tempo guardamos</h2>
+            <p>
+                O histórico de atendimentos é mantido pelo prazo exigido para prontuários médicos
+                (Lei nº 13.787/2018). Por isso, um paciente com atendimentos registrados não tem o histórico
+                apagado a pedido: os dados ficam guardados com acesso restrito durante esse prazo.
+            </p>
+
+            <h2 class="h5 mt-4">Seus direitos</h2>
+            <p>Você pode, a qualquer momento:</p>
+            <ul>
+                <li><strong>Acessar e baixar seus dados:</strong> em "Meus dados", botão "Baixar meus dados".</li>
+                <li><strong>Corrigir dados</strong> incompletos ou desatualizados, pedindo à recepção.</li>
+                <li><strong>Saber com quem seus dados foram compartilhados</strong> e pedir informações sobre o tratamento.</li>
+                <li><strong>Pedir a exclusão</strong> dos dados que não estejam sujeitos à guarda obrigatória
+                    (por exemplo, um cadastro sem nenhum atendimento).</li>
+            </ul>
+
+            <h2 class="h5 mt-4">Segurança</h2>
+            <p>
+                O acesso exige usuário e senha, a conta é bloqueada temporariamente após várias senhas erradas,
+                cada perfil só vê o que precisa e as operações ficam registradas na auditoria.
+            </p>
+
+            <h2 class="h5 mt-4">Contato</h2>
+            <p>
+                Dúvidas ou pedidos sobre seus dados: fale com a recepção da clínica ou com o encarregado
+                pelo tratamento de dados (contato a ser definido pela clínica).
+            </p>
+
+            <div class="mt-4 mb-5">
+                <a class="btn btn-outline-secondary" th:href="@{/pacientes/form}" sec:authorize="!isAuthenticated()">Voltar ao cadastro</a>
+                <a class="btn btn-outline-secondary" th:href="@{/}" sec:authorize="isAuthenticated()">Voltar ao início</a>
+            </div>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

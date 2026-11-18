@@ -12,16 +12,16 @@
         <h1 class="h3 mb-0" th:text="${titulo}">Agendamentos</h1>
         <div class="d-flex flex-wrap gap-2">
             <a class="btn btn-outline-primary" th:href="@{/agenda/dia}"
-               sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Agenda do dia</a>
-            <a class="btn btn-primary" th:href="@{/agenda/list}">Novo agendamento</a>
+               sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Agenda do dia</a>
+            <a class="btn btn-primary" th:href="@{/agenda/list}" sec:authorize="hasRole('ATENDENTE')">Novo agendamento</a>
         </div>
     </div>
 
     <div th:replace="~{fragments/layout :: mensagem}"></div>
     <div th:replace="~{fragments/layout :: erro}"></div>
 
-    <p class="text-secondary small" sec:authorize="hasRole('PACIENTE') and !hasAnyRole('ADMIN','USER','MEDICO')">
-        Você pode cancelar ou reagendar até 24 horas antes do horário. Depois disso, entre em contato com a clínica.
+    <p class="text-secondary small" sec:authorize="hasRole('PACIENTE') and !hasAnyRole('ADMIN','ATENDENTE','MEDICO')">
+        Para marcar, remarcar ou cancelar uma consulta, entre em contato com o atendimento da clínica.
     </p>
 
     <form class="card card-body border-0 shadow-sm mb-3" method="get" th:if="${filtro != null}"
@@ -74,7 +74,7 @@
                     <th>Paciente</th>
                     <th>Médico</th>
                     <th>Situação</th>
-                    <th>Ações</th>
+                    <th sec:authorize="hasRole('ATENDENTE')">Ações</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -85,7 +85,7 @@
                     <td th:text="${agendamento.paciente.nome}"></td>
                     <td th:text="${agendamento.agenda.medico.nome}"></td>
                     <td><div th:replace="~{fragments/agendamento :: situacao(${agendamento})}"></div></td>
-                    <td><div th:replace="~{fragments/agendamento :: acoes(${agendamento}, ${descricao})}"></div></td>
+                    <td sec:authorize="hasRole('ATENDENTE')"><div th:replace="~{fragments/agendamento :: acoes(${agendamento}, ${descricao})}"></div></td>
                 </tr>
                 </tbody>
             </table>

@@ -2,6 +2,14 @@ package br.edu.ifto.aula1.Controller;
 
 import br.edu.ifto.aula1.Model.Entity.Agendamento;
 import br.edu.ifto.aula1.Model.Entity.Consulta;
+import br.edu.ifto.aula1.Model.Entity.Paciente;
+import br.edu.ifto.aula1.Service.ExportacaoDadosService;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ResponseBody;
 import br.edu.ifto.aula1.Model.Entity.Usuario;
 import br.edu.ifto.aula1.Model.repository.UsuarioRepository;
 import br.edu.ifto.aula1.Service.AgendamentoService;
@@ -37,17 +45,19 @@ public class UsuarioController {
     private final MedicoService medicoService;
     private final ConsultaService consultaService;
     private final AgendamentoService agendamentoService;
+    private final ExportacaoDadosService exportacaoDadosService;
 
     private static final int TAMANHO_PAGINA = 10;
 
     public UsuarioController(UsuarioRepository usuarios, PacienteService pacienteService,
                              MedicoService medicoService, ConsultaService consultaService,
-                             AgendamentoService agendamentoService) {
+                             AgendamentoService agendamentoService, ExportacaoDadosService exportacaoDadosService) {
         this.usuarios = usuarios;
         this.pacienteService = pacienteService;
         this.medicoService = medicoService;
         this.consultaService = consultaService;
         this.agendamentoService = agendamentoService;
+        this.exportacaoDadosService = exportacaoDadosService;
     }
 
     @GetMapping("/dados")
@@ -61,6 +71,25 @@ public class UsuarioController {
         model.addAttribute("paciente", pacienteService.buscarPorLogin(login).orElse(null));
         model.addAttribute("medico", medicoService.buscarPorLogin(login).orElse(null));
         return new ModelAndView("usuario/dados", model);
+    }
+
+    /**
+     * LGPD: o paciente baixa os próprios dados em JSON. Sem id na URL: o paciente é o da
+     * conta autenticada. Contas sem paciente vinculado (equipe) recebem 404.
+     */
+    @GetMapping(value = "/dados/exportar", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<ExportacaoDadosService.Exportacao> exportarDados(@AuthenticationPrincipal UserDetails autenticado) {
+        String login = autenticado.getUsername();
+        Paciente paciente = pacienteService.buscarPorLogin(login)
+                .orElseThrow(() -> new RegistroNaoEncontradoException("Esta conta não pertence a um paciente."));
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename("meus-dados-clinica.json").build().toString())
+                // Dados pessoais e de saúde: nada de cache no navegador ou em proxies.
+                .cacheControl(CacheControl.noStore())
+                .body(exportacaoDadosService.exportar(paciente, login));
     }
 
     /** Consultas do paciente ou do médico dono da conta autenticada. */

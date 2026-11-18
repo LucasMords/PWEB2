@@ -23,6 +23,35 @@ Abra `http://localhost:8080`. O console H2 fica em `/h2-console` (URL `jdbc:h2:m
 
 Testes: `mvnw.cmd test`.
 
+## Operacao
+
+**Docker.** O `Dockerfile` compila em uma etapa com o JDK 25 e roda em outra so com o JRE,
+como usuario sem privilegios, com as camadas do Spring Boot separadas (bibliotecas em
+cache, so as classes mudam a cada build):
+
+```cmd
+docker compose up --build
+```
+
+A imagem ativa o perfil `prod` (`application-prod.properties`): sem SQL no log, sem
+console H2, cache de templates ligado, logs em JSON (formato ECS, uma linha por evento) e
+cookie de sessao `Secure`. O HTTPS fica num proxy reverso na frente da aplicacao; os
+cabecalhos `X-Forwarded-*` sao respeitados. O banco ainda e o H2 em memoria, entao os
+dados se perdem quando o container reinicia.
+
+**Health check.** `GET /actuator/health` (publico) responde `{"status":"UP"}`;
+`/actuator/health/liveness` e `/actuator/health/readiness` servem para orquestradores.
+So o ADMIN ve os detalhes (banco, disco). Nenhum outro endpoint do Actuator e exposto. O
+`HEALTHCHECK` do Dockerfile usa o liveness.
+
+**CI.** `.github/workflows/ci.yml` roda a cada push na `master` e em pull requests: compila
+e executa todos os testes (`mvnw verify`, com os relatorios anexados se falhar), depois
+gera a imagem Docker, sobe o container e espera o health check responder. Nada e
+publicado.
+
+**Erros.** Erros inesperados mostram uma pagina generica (`templates/error/5xx.html`);
+o detalhe tecnico fica so no log.
+
 ## Camadas
 
 | Pacote | Papel |
@@ -44,16 +73,18 @@ Testes: `mvnw.cmd test`.
 
 Fluxo:
 
-1. **Cadastro de horario** (`/agenda/form`): administracao e recepcao escolhem o medico; o medico cadastra apenas a propria agenda. Nao aceita data/hora no passado nem horario repetido para o mesmo medico.
+Quem faz o que: o **medico** cadastra os horarios disponiveis da propria agenda; o **atendente** (secretaria/recepcao) informa os horarios livres ao paciente e marca, remarca e cancela as consultas, alem de confirmar a presenca e registrar a falta; o **paciente** apenas acompanha os proprios agendamentos e consultas realizadas (marcar, remarcar ou cancelar e com o atendimento). A conta `admin` tem tambem o perfil de atendente.
+
+1. **Cadastro de horario** (`/agenda/form`, so `MEDICO`): o medico cadastra apenas a propria agenda; o medico vem da conta, nao do formulario. Nao aceita data/hora no passado nem horario repetido para o mesmo medico.
    - **Geracao em lote** (`/agenda/lote`): periodo de ate 92 dias, dias da semana, faixa de horario e duracao da consulta (10 a 240 min). Gera um horario por intervalo; a ultima consulta termina no maximo no horario final. Horarios que ja existem ou ja passaram sao ignorados, entao o mesmo lote pode ser gerado de novo. Tudo e gravado numa transacao, com limite de 1000 horarios por lote.
-2. **Horarios disponiveis** (`/agenda/list`): lista paginada dos horarios `DISPONIVEL` que ainda nao passaram, com filtros por medico, especialidade e data.
-3. **Agendamento** (`/agendamentos/novo/{agendaId}` e `POST /agendamentos/save`): cria o `Agendamento` (`AGENDADO`) e muda a `Agenda` para `AGENDADO` na mesma transacao. Nenhuma consulta e criada. O paciente agenda sempre para si (a conta autenticada decide, nao o formulario); a equipe escolhe o paciente.
-4. **Confirmacao de presenca** (`POST /agendamentos/confirmar/{id}`, so `ADMIN` e `USER`): cria a `Consulta` e muda o agendamento para `REALIZADO`, na mesma transacao. So vale a partir de 1 hora antes do horario (`Agendamento.ANTECEDENCIA_CONFIRMACAO`). Uma segunda tentativa e rejeitada.
-5. **Falta** (`POST /agendamentos/falta/{id}`, so `ADMIN` e `USER`): depois do horario, marca o agendamento como `FALTOU`. Nenhuma consulta e criada e o horario, que ja passou, continua ocupado.
-6. **Cancelamento** (`POST /agendamentos/cancelar/{id}`): o agendamento vira `CANCELADO` (nao e excluido) e a agenda volta para `DISPONIVEL`. Ficam registrados quem cancelou (login), quando e o motivo, que e opcional (ate 255 caracteres). Um novo agendamento do mesmo horario cria outro registro. Agendamento `REALIZADO` ou `FALTOU` nao pode ser cancelado. O paciente so cancela os proprios agendamentos e ate 24 horas antes do horario (`Agendamento.PRAZO_CANCELAMENTO_PACIENTE`); a equipe pode cancelar a qualquer momento (ex.: o medico nao pode atender).
-   - **Reagendamento** (`/agendamentos/reagendar/{id}`): troca o horario por outro livre do mesmo medico numa unica transacao. O agendamento atual fica `CANCELADO` com o motivo "Reagendado para ..." e nasce um novo `AGENDADO` para o mesmo paciente. Se o novo horario nao estiver livre, nada muda. Valem as regras do cancelamento (paciente: so o proprio e ate 24 horas antes).
-   - **Agenda do dia** (`/agenda/dia`, equipe): todos os horarios de uma data agrupados por medico, livres e ocupados, com o paciente, a situacao, um resumo (livres, aguardando, realizados, faltas) e as acoes. O medico ve so a propria agenda. Depois de uma acao feita ali, a tela volta para o mesmo dia.
-7. **Historico** (`/consultas/list`, `/usuario/consultas`, `/usuario/agendamentos`): consultas registradas e agendamentos de quem esta autenticado. Na consulta so as observacoes sao editaveis.
+2. **Horarios disponiveis** (`/agenda/list`, equipe): lista paginada dos horarios `DISPONIVEL` que ainda nao passaram, com filtros por medico, especialidade e data. O botao "Agendar" so aparece para o atendente.
+3. **Agendamento** (`/agendamentos/novo/{agendaId}` e `POST /agendamentos/save`, so `ATENDENTE`): o atendente escolhe o paciente; cria o `Agendamento` (`AGENDADO`) e muda a `Agenda` para `AGENDADO` na mesma transacao. Nenhuma consulta e criada.
+4. **Confirmacao de presenca** (`POST /agendamentos/confirmar/{id}`, so `ATENDENTE`): cria a `Consulta` e muda o agendamento para `REALIZADO`, na mesma transacao. So vale a partir de 1 hora antes do horario (`Agendamento.ANTECEDENCIA_CONFIRMACAO`). Uma segunda tentativa e rejeitada.
+5. **Falta** (`POST /agendamentos/falta/{id}`, so `ATENDENTE`): depois do horario, marca o agendamento como `FALTOU`. Nenhuma consulta e criada e o horario, que ja passou, continua ocupado.
+6. **Cancelamento** (`POST /agendamentos/cancelar/{id}`, so `ATENDENTE`, a qualquer momento antes do atendimento, ex.: o paciente avisou ou o medico nao pode atender): o agendamento vira `CANCELADO` (nao e excluido) e a agenda volta para `DISPONIVEL`. Ficam registrados quem cancelou (login), quando e o motivo, que e opcional (ate 255 caracteres). Um novo agendamento do mesmo horario cria outro registro. Agendamento `REALIZADO` ou `FALTOU` nao pode ser cancelado.
+   - **Reagendamento** (`/agendamentos/reagendar/{id}`, so `ATENDENTE`): troca o horario por outro livre do mesmo medico numa unica transacao. O agendamento atual fica `CANCELADO` com o motivo "Reagendado para ..." e nasce um novo `AGENDADO` para o mesmo paciente. Se o novo horario nao estiver livre, nada muda.
+   - **Agenda do dia** (`/agenda/dia`, equipe): todos os horarios de uma data agrupados por medico, livres e ocupados, com o paciente, a situacao, um resumo (livres, aguardando, realizados, faltas) e, para o atendente, as acoes. O medico ve so a propria agenda. Depois de uma acao feita ali, a tela volta para o mesmo dia.
+7. **Historico** (`/consultas/list`, `/usuario/consultas`, `/usuario/agendamentos`): consultas registradas e, so para leitura, os agendamentos e consultas de quem esta autenticado. Na consulta so as observacoes sao editaveis.
 
 Integridade e concorrencia:
 
@@ -64,6 +95,16 @@ Integridade e concorrencia:
 - Medico com horarios na agenda e paciente com agendamentos nao podem ser excluidos, para preservar o historico.
 - As regras de horario leem a hora por um `java.time.Clock` (bean em `Config.RelogioConfig`), e nao por `LocalDateTime.now()` direto, para que os testes possam fixar o "agora". Na tela, os botoes de confirmar, registrar falta e cancelar so ficam habilitados quando a acao cabe no status e no horario; o servico confere tudo de novo.
 - O `import.sql` inclui um agendamento de ontem ainda pendente (Ana com o Dr. Eduardo), para demonstrar a confirmacao de presenca e o registro de falta.
+
+## Seguranca e LGPD
+
+Detalhes em `SECURITY.md`. Em resumo:
+
+- **Bloqueio por tentativas**: 5 senhas erradas seguidas bloqueiam a conta por 15 minutos.
+- **Politica de senha**: 8 a 72 caracteres, letras e numeros, sem conter o usuario.
+- **Cabecalhos de seguranca**: Content-Security-Policy sem scripts inline, Referrer-Policy, Permissions-Policy, alem dos padroes do Spring Security.
+- **Auditoria** (`/auditoria`, so ADMIN): quem fez o que e quando, gravada na mesma transacao da operacao.
+- **LGPD**: aceite obrigatorio da politica de privacidade (`/privacidade`) no cadastro, com data registrada; o paciente baixa os proprios dados em JSON em "Meus dados".
 
 ## Spring Data JPA
 
@@ -87,7 +128,7 @@ Implementacao alinhada ao [capitulo de validacao](https://fagno.github.io/pwebii
 - Medico: nome, CRM e especialidade obrigatorios. O CRM exige uma UF brasileira e um numero de ate seis digitos, e nao pode se repetir.
 - E-mail e telefone sao opcionais; o e-mail deve ser valido quando preenchido.
 - Horario da agenda: medico, data e horario obrigatorios; data e hora nao podem estar no passado nem repetir um horario do mesmo medico.
-- Agendamento: horario obrigatorio e, para a equipe, paciente obrigatorio. Disponibilidade e transicoes de status sao conferidas no servico.
+- Agendamento: horario e paciente obrigatorios. Disponibilidade e transicoes de status sao conferidas no servico.
 - Consulta: as observacoes tem no maximo 500 caracteres.
 - `messages.properties` traduz os erros de conversao do Spring MVC (data invalida, id nao numerico).
 

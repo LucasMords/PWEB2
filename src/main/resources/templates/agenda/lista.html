@@ -9,7 +9,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h1 class="h3 mb-0">Horários disponíveis</h1>
         <!-- Esconder o botão é só comodidade: quem protege a URL é a SecurityConfiguration. -->
-        <div class="d-flex flex-wrap gap-2" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">
+        <div class="d-flex flex-wrap gap-2" sec:authorize="hasRole('MEDICO')">
             <a class="btn btn-outline-primary" th:href="@{/agenda/lote}">Gerar horários em lote</a>
             <a class="btn btn-primary" th:href="@{/agenda/form}">Cadastrar horário</a>
         </div>
@@ -60,7 +60,7 @@
                     <th>Horário</th>
                     <th>Médico</th>
                     <th>Especialidade</th>
-                    <th>Ações</th>
+                    <th sec:authorize="hasRole('ATENDENTE')">Ações</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -69,7 +69,7 @@
                     <td th:text="${#temporals.format(agenda.horario, 'HH:mm')}"></td>
                     <td th:text="${agenda.medico.nome}"></td>
                     <td th:text="${agenda.medico.especialidade}"></td>
-                    <td>
+                    <td sec:authorize="hasRole('ATENDENTE')">
                         <a class="btn btn-sm btn-primary"
                            th:href="@{/agendamentos/novo/{id}(id=${agenda.id})}">Agendar</a>
                     </td>

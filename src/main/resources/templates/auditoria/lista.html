@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Auditoria')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container">
+    <h1 class="h3 mb-1">Auditoria</h1>
+    <p class="text-secondary">Quem fez o quê e quando. Os registros não podem ser alterados nem excluídos pelo sistema.</p>
+
+    <form class="card card-body border-0 shadow-sm mb-3" method="get" th:action="@{/auditoria}">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="usuario">Usuário</label>
+                <input type="text" class="form-control" id="usuario" name="usuario" th:value="${usuario}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="acao">Ação</label>
+                <select class="form-select" id="acao" name="acao">
+                    <option value="">Todas</option>
+                    <option th:each="item : ${acoes}" th:value="${item}" th:text="${item.descricao}"
+                            th:selected="${item == acao}"></option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="de">De</label>
+                <input type="date" class="form-control" id="de" name="de" th:value="${de}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="ate">Até</label>
+                <input type="date" class="form-control" id="ate" name="ate" th:value="${ate}">
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">Filtrar</button>
+                <a class="btn btn-outline-secondary" th:href="@{/auditoria}">Limpar</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="alert alert-light border" th:if="${pagina.empty}">Nenhum registro encontrado.</div>
+
+    <div class="card border-0 shadow-sm" th:unless="${pagina.empty}">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Quando</th>
+                    <th>Usuário</th>
+                    <th>Ação</th>
+                    <th>Registro</th>
+                    <th>Detalhe</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="registro : ${pagina.content}">
+                    <td class="text-nowrap" th:text="${#temporals.format(registro.dataHora, 'dd/MM/yyyy HH:mm:ss')}"></td>
+                    <td th:text="${registro.usuario}"></td>
+                    <td th:text="${registro.acao.descricao}"></td>
+                    <td class="text-nowrap"
+                        th:text="${registro.entidadeId != null} ? |${registro.entidade} nº ${registro.entidadeId}| : ${registro.entidade}"></td>
+                    <td class="small" th:text="${registro.detalhe}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <nav class="mt-3" aria-label="Páginas da auditoria" th:if="${pagina.totalPages > 1}">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item" th:classappend="${pagina.first} ? 'disabled'">
+                <a class="page-link"
+                   th:href="@{/auditoria(page=${pagina.number - 1}, usuario=${usuario}, acao=${acao}, de=${de}, ate=${ate})}">Anterior</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link" th:text="|Página ${pagina.number + 1} de ${pagina.totalPages}|"></span>
+            </li>
+            <li class="page-item" th:classappend="${pagina.last} ? 'disabled'">
+                <a class="page-link"
+                   th:href="@{/auditoria(page=${pagina.number + 1}, usuario=${usuario}, acao=${acao}, de=${de}, ate=${ate})}">Próxima</a>
+            </li>
+        </ul>
+    </nav>
+</main>
+
+</body>
+</html>

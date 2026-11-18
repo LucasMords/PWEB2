@@ -26,13 +26,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Usa os usuários criados pelo InitialUsersInitializer: admin/Admin123 e user/User123. */
+/** Usa os usuários criados pelo InitialUsersInitializer: admin/Admin123 e atendente/Atendente123. */
 @SpringBootTest
 @AutoConfigureMockMvc
 class SecurityIntegrationTests {
 
-    private static final String USER = "user";
-    private static final String SENHA_USER = "User123";
+    private static final String USER = "atendente";
+    private static final String SENHA_USER = "Atendente123";
     private static final String ADMIN = "admin";
 
     @Autowired private MockMvc mvc;
@@ -67,7 +67,7 @@ class SecurityIntegrationTests {
     void usuarioInativoNaoAutentica() throws Exception {
         String login = "inativo-test";
         Usuario inativo = new Usuario(login, passwordEncoder.encode("Senha-teste-123!"), false);
-        inativo.adicionarPerfil(perfis.findByNome("USER").orElseThrow());
+        inativo.adicionarPerfil(perfis.findByNome("ATENDENTE").orElseThrow());
         usuarios.saveAndFlush(inativo);
 
         mvc.perform(post("/login").with(csrf()).param("username", login).param("password", "Senha-teste-123!"))
@@ -76,11 +76,11 @@ class SecurityIntegrationTests {
 
     @Test
     void userAcessaAreasPermitidasMasNaoAsExclusivasDoAdmin() throws Exception {
-        mvc.perform(get("/pacientes/list").with(user(USER).roles("USER")))
+        mvc.perform(get("/pacientes/list").with(user(USER).roles("ATENDENTE")))
                 .andExpect(status().isOk());
-        mvc.perform(get("/medicos/form").with(user(USER).roles("USER")))
+        mvc.perform(get("/medicos/form").with(user(USER).roles("ATENDENTE")))
                 .andExpect(status().isForbidden());
-        mvc.perform(get("/medicos/form").with(user(ADMIN).roles("ADMIN", "USER")))
+        mvc.perform(get("/medicos/form").with(user(ADMIN).roles("ADMIN", "ATENDENTE")))
                 .andExpect(status().isOk());
     }
 
@@ -109,23 +109,23 @@ class SecurityIntegrationTests {
         // e chegou ao controller, sem apagar os dados usados pelos outros testes.
         String url = "/pacientes/remove/999999";
 
-        mvc.perform(post(url).with(csrf()).with(user(ADMIN).roles("ADMIN", "USER")))
+        mvc.perform(post(url).with(csrf()).with(user(ADMIN).roles("ADMIN", "ATENDENTE")))
                 .andExpect(status().isNotFound());
-        mvc.perform(post(url).with(csrf()).with(user(USER).roles("USER")))
+        mvc.perform(post(url).with(csrf()).with(user(USER).roles("ATENDENTE")))
                 .andExpect(status().isForbidden());
-        mvc.perform(post(url).with(user(ADMIN).roles("ADMIN", "USER")))
+        mvc.perform(post(url).with(user(ADMIN).roles("ADMIN", "ATENDENTE")))
                 .andExpect(status().isForbidden());
-        mvc.perform(get(url).with(user(ADMIN).roles("ADMIN", "USER")))
+        mvc.perform(get(url).with(user(ADMIN).roles("ADMIN", "ATENDENTE")))
                 .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
     void listaDeMedicosSoMostraAcoesDeAdminParaOAdmin() throws Exception {
-        mvc.perform(get("/medicos/list").with(user(ADMIN).roles("ADMIN", "USER")))
+        mvc.perform(get("/medicos/list").with(user(ADMIN).roles("ADMIN", "ATENDENTE")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("/medicos/remove/")))
                 .andExpect(content().string(containsString("/medicos/edit/")));
-        mvc.perform(get("/medicos/list").with(user(USER).roles("USER")))
+        mvc.perform(get("/medicos/list").with(user(USER).roles("ATENDENTE")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("/medicos/remove/"))))
                 .andExpect(content().string(not(containsString("/medicos/edit/"))));
@@ -133,18 +133,18 @@ class SecurityIntegrationTests {
 
     @Test
     void paginaMeusDadosMostraLoginEPerfisDoUsuarioAutenticado() throws Exception {
-        mvc.perform(get("/usuario/dados").with(user(ADMIN).roles("ADMIN", "USER")))
+        mvc.perform(get("/usuario/dados").with(user(ADMIN).roles("ADMIN", "ATENDENTE")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString(">admin<")))
                 .andExpect(content().string(containsString(">ADMIN<")))
-                .andExpect(content().string(containsString(">USER<")));
+                .andExpect(content().string(containsString(">ATENDENTE<")));
         mvc.perform(get("/usuario/dados").accept(MediaType.TEXT_HTML))
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login"));
     }
 
     @Test
     void logoutExigePostComCsrfEEncerraASessao() throws Exception {
-        mvc.perform(post("/logout").with(user(USER).roles("USER")))
+        mvc.perform(post("/logout").with(user(USER).roles("ATENDENTE")))
                 .andExpect(status().isForbidden());
 
         var autenticacao = mvc.perform(post("/login").with(csrf())
@@ -159,5 +159,32 @@ class SecurityIntegrationTests {
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login?logout"));
         mvc.perform(get("/").session(sessao).accept(MediaType.TEXT_HTML))
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void healthCheckEPublicoMasSoOAdminVeOsDetalhes() throws Exception {
+        mvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("\"status\":\"UP\"")))
+                .andExpect(content().string(not(containsString("components"))));
+        mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
+        mvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
+
+        mvc.perform(get("/actuator/health").with(user(USER).roles("ATENDENTE")))
+                .andExpect(content().string(not(containsString("components"))));
+        mvc.perform(get("/actuator/health").with(user(ADMIN).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("\"db\"")));
+    }
+
+    @Test
+    void outrosEndpointsDoActuatorNaoFicamExpostos() throws Exception {
+        mvc.perform(get("/actuator/env").with(user(USER).roles("ATENDENTE")))
+                .andExpect(status().isForbidden());
+        // Mesmo para o ADMIN: só o health é exposto pela web.
+        mvc.perform(get("/actuator/env").with(user(ADMIN).roles("ADMIN")))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/actuator/beans").with(user(ADMIN).roles("ADMIN")))
+                .andExpect(status().isNotFound());
     }
 }

@@ -1,0 +1,11 @@
+# Sobe a aplicacao localmente com o perfil de producao: docker compose up --build
+# Acesse http://localhost:8080 (as contas iniciais estao no SECURITY.md).
+services:
+  clinica:
+    build: .
+    image: clinica
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    restart: unless-stopped

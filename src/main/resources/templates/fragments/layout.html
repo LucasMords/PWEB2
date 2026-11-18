@@ -26,14 +26,15 @@
         <a class="navbar-brand fw-bold" th:href="@{/}">Clínica IFTO</a>
         <div class="navbar-nav flex-wrap">
             <!-- Cadastros e gerenciamento: só a equipe. O paciente e o médico veem o que é deles. -->
-            <a class="nav-link" th:href="@{/pacientes/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Pacientes</a>
-            <a class="nav-link" th:href="@{/medicos/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Médicos</a>
-            <a class="nav-link" th:href="@{/agenda/list}" sec:authorize="isAuthenticated()">Horários disponíveis</a>
-            <a class="nav-link" th:href="@{/agenda/dia}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Agenda do dia</a>
-            <a class="nav-link" th:href="@{/agendamentos/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Agendamentos</a>
-            <a class="nav-link" th:href="@{/consultas/list}" sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Consultas</a>
+            <a class="nav-link" th:href="@{/pacientes/list}" sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Pacientes</a>
+            <a class="nav-link" th:href="@{/medicos/list}" sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Médicos</a>
+            <a class="nav-link" th:href="@{/agenda/list}" sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Horários disponíveis</a>
+            <a class="nav-link" th:href="@{/agenda/dia}" sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Agenda do dia</a>
+            <a class="nav-link" th:href="@{/agendamentos/list}" sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Agendamentos</a>
+            <a class="nav-link" th:href="@{/consultas/list}" sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Consultas</a>
             <a class="nav-link" th:href="@{/usuario/agendamentos}" sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Meus agendamentos</a>
             <a class="nav-link" th:href="@{/usuario/consultas}" sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Minhas consultas</a>
+            <a class="nav-link" th:href="@{/auditoria}" sec:authorize="hasRole('ADMIN')">Auditoria</a>
         </div>
     </div>
 </nav>
@@ -84,7 +85,7 @@
             <input type="password" class="form-control" th:field="${credenciais.senha}" th:errorclass="is-invalid"
                    autocomplete="new-password">
             <div class="invalid-feedback" th:errors="${credenciais.senha}"></div>
-            <div class="form-text">Mínimo de 8 caracteres.</div>
+            <div class="form-text">Mínimo de 8 caracteres, com letras e números, sem conter o usuário.</div>
         </div>
     </div>
 </fieldset>

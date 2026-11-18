@@ -55,7 +55,7 @@
 
     <div class="alert alert-light border" th:if="${agendaDoDia.vazia}">
         Nenhum horário cadastrado nesta data.
-        <a th:href="@{/agenda/lote}">Gerar horários</a>
+        <a th:href="@{/agenda/lote}" sec:authorize="hasRole('MEDICO')">Gerar horários</a>
     </div>
 
     <section class="card border-0 shadow-sm mb-3" th:each="grupo : ${agendaDoDia.grupos}">
@@ -69,10 +69,10 @@
             <table class="table align-middle mb-0">
                 <thead>
                 <tr>
-                    <th style="width: 6rem">Horário</th>
+                    <th class="coluna-horario">Horário</th>
                     <th>Paciente</th>
                     <th>Situação</th>
-                    <th>Ações</th>
+                    <th sec:authorize="hasRole('ATENDENTE')">Ações</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -83,7 +83,7 @@
                     <th:block th:if="${linha.livre}">
                         <td class="text-secondary">—</td>
                         <td><span class="badge text-bg-light border">Livre</span></td>
-                        <td>
+                        <td sec:authorize="hasRole('ATENDENTE')">
                             <a class="btn btn-sm btn-outline-primary" th:if="${agenda.dataHora.isAfter(agora)}"
                                th:href="@{/agendamentos/novo/{id}(id=${agenda.id})}">Agendar</a>
                         </td>
@@ -97,7 +97,7 @@
                             <div class="small text-secondary" th:text="${agendamento.paciente.telefone}"></div>
                         </td>
                         <td><div th:replace="~{fragments/agendamento :: situacao(${agendamento})}"></div></td>
-                        <td><div th:replace="~{fragments/agendamento :: acoes(${agendamento}, ${descricao})}"></div></td>
+                        <td sec:authorize="hasRole('ATENDENTE')"><div th:replace="~{fragments/agendamento :: acoes(${agendamento}, ${descricao})}"></div></td>
                     </th:block>
                 </tr>
                 </tbody>

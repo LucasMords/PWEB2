@@ -1,5 +1,6 @@
 package br.edu.ifto.aula1.Service;
 
+import br.edu.ifto.aula1.Model.Entity.AcaoAuditoria;
 import br.edu.ifto.aula1.Model.Entity.Medico;
 import br.edu.ifto.aula1.Model.Entity.Perfil;
 import br.edu.ifto.aula1.Model.repository.AgendaRepository;
@@ -19,9 +20,11 @@ public class MedicoService {
     private final MedicoRepository repository;
     private final UsuarioService usuarioService;
     private final AgendaRepository agendaRepository;
+    private final AuditoriaService auditoria;
 
     public MedicoService(MedicoRepository repository, UsuarioService usuarioService,
-                         AgendaRepository agendaRepository) {
+                         AgendaRepository agendaRepository, AuditoriaService auditoria) {
+        this.auditoria = auditoria;
         this.repository = repository;
         this.usuarioService = usuarioService;
         this.agendaRepository = agendaRepository;
@@ -66,7 +69,9 @@ public class MedicoService {
     public Medico cadastrar(Medico medico, Credenciais credenciais) {
         medico.setId(null);
         medico.vincularUsuario(usuarioService.criar(credenciais, Perfil.MEDICO));
-        return repository.save(medico);
+        Medico salvo = repository.save(medico);
+        auditoria.registrar(AcaoAuditoria.MEDICO_CADASTRADO, "Medico", salvo.getId(), "Conta " + credenciais.getLogin());
+        return salvo;
     }
 
     /**
@@ -82,6 +87,7 @@ public class MedicoService {
         medico.setEspecialidade(dados.getEspecialidade());
         medico.setTelefone(dados.getTelefone());
         medico.setEmail(dados.getEmail());
+        auditoria.registrar(AcaoAuditoria.MEDICO_ALTERADO, "Medico", medico.getId(), null);
 
         return medico;
     }
@@ -97,6 +103,7 @@ public class MedicoService {
             throw new RegraNegocioException("Não é possível excluir um médico que tem horários na agenda.");
 
         repository.delete(medico);
+        auditoria.registrar(AcaoAuditoria.MEDICO_EXCLUIDO, "Medico", id, null);
     }
 
     /** Especialidades dos médicos cadastrados, em ordem alfabética. */

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -50,14 +51,18 @@ public class PacienteController {
     @PostMapping("/save")
     public ModelAndView save(@Valid Paciente paciente, BindingResult result,
                              @Valid Credenciais credenciais, BindingResult resultCredenciais,
-                             HttpServletRequest request, RedirectAttributes attributes) {
+                             @RequestParam(name = "consentimento", defaultValue = "false") boolean consentimento,
+                             HttpServletRequest request, ModelMap model, RedirectAttributes attributes) {
         paciente.setId(null); // cadastro nunca usa id vindo da requisição (nem na checagem de CPF duplicado)
         validarCpfUnico(paciente, result);
         credenciaisValidator.validate(credenciais, resultCredenciais);
-        if (result.hasErrors() || resultCredenciais.hasErrors())
-            return new ModelAndView("paciente/formulario");
+        // LGPD: o aceite da política de privacidade é obrigatório (o serviço confere de novo).
+        if (!consentimento)
+            model.addAttribute("erroConsentimento", PacienteService.CONSENTIMENTO_OBRIGATORIO);
+        if (result.hasErrors() || resultCredenciais.hasErrors() || !consentimento)
+            return new ModelAndView("paciente/formulario", model);
 
-        service.cadastrar(paciente, credenciais);
+        service.cadastrar(paciente, credenciais, consentimento);
 
         // Quem se cadastrou sozinho segue para o login; a equipe volta para a lista de pacientes.
         if (request.getUserPrincipal() == null || request.isUserInRole(Perfil.PACIENTE)) {

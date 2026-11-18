@@ -9,9 +9,14 @@ without the `ROLE_` prefix; Spring Security adds it (`ADMIN` -> `ROLE_ADMIN`).
 | Profile    | Who                                   | How the account is created                  |
 |------------|---------------------------------------|---------------------------------------------|
 | `ADMIN`    | Clinic administration                 | `InitialUsersInitializer`                   |
-| `USER`     | Reception                             | `InitialUsersInitializer`                   |
+| `ATENDENTE`| Secretary / front desk: books the appointments | `InitialUsersInitializer`          |
 | `MEDICO`   | Doctor (institutional account)        | By an `ADMIN`, in the doctor registration   |
-| `PACIENTE` | Patient                               | By the patient, in the public registration  |
+| `PACIENTE` | Patient (read-only access to their own bookings and appointments) | By the patient, in the public registration |
+
+Division of work: the doctor publishes the available time slots of their own
+schedule; the `ATENDENTE` tells the patient which slots are free and books,
+reschedules or cancels the appointment, and records attendance or no-show; the
+patient only follows their bookings and past appointments.
 
 The constants live in `Perfil` (`Perfil.ADMIN`, `Perfil.PACIENTE`, ...).
 
@@ -47,11 +52,20 @@ hash with the same encoder; plain text in that column will not authenticate.
 Then `InitialUsersInitializer` creates whatever is still missing: the staff
 accounts (and the profiles, if `import.sql` stops inserting them):
 
-- Admin: `admin` / `Admin123` (profiles `ADMIN` and `USER`)
-- Reception: `user` / `User123` (profile `USER`)
+- Admin: `admin` / `Admin123` (profiles `ADMIN` and `ATENDENTE`)
+- Front desk: `atendente` / `Atendente123` (profile `ATENDENTE`)
 
 These are development credentials only. The integration tests log in with them,
-so change the tests together.
+so change the tests together. The `prod` profile (Docker image) still creates
+them: change the passwords before exposing the application to real users.
+
+## Production profile
+
+`application-prod.properties` (active in the Docker image) turns off SQL logging,
+which could leak patient data, and the H2 console. It marks the session cookie
+`Secure` and trusts the `X-Forwarded-*` headers of the reverse proxy that
+terminates HTTPS, so redirects and HSTS use `https`. The container runs as a
+non-root user.
 
 The current datasource is an in-memory H2 database and the schema is recreated
 on each run (`spring.jpa.hibernate.ddl-auto=create-drop`), so every account,
@@ -60,40 +74,101 @@ remember-me cookies stop being valid.
 
 ## Access rules
 
-- Public: `/login`, static CSS/JavaScript/images, `/error`, and the patient
-  registration (`GET /pacientes/form`, `POST /pacientes/save`).
-- Any authenticated user: `/`, `/usuario/**` (own data, own bookings and own
-  appointments), the available time slots (`GET /agenda/list`), booking a slot
-  (`GET /agendamentos/novo/{agendaId}`, `POST /agendamentos/save`),
-  cancelling a booking (`POST /agendamentos/cancelar/{id}`) and moving it to
-  another slot (`/agendamentos/reagendar/{id}`).
-- `ADMIN`, `USER` and `MEDICO`: patients, the list of doctors, registering time
-  slots (`/agenda/form`, `POST /agenda/save`, and in batch: `/agenda/lote`), the
-  booking management page (`/agendamentos/list`), the day schedule
-  (`/agenda/dia`; a `MEDICO` only sees their own) and the appointment history
-  (`/consultas/**`).
-- `ADMIN` and `USER` only: confirming a patient's attendance
+- Public: `/login`, static CSS/JavaScript/images, `/error`, the privacy policy
+  (`/privacidade`), the patient registration (`GET /pacientes/form`,
+  `POST /pacientes/save`) and the health check (`GET /actuator/health`, plus
+  `/liveness` and `/readiness`). Anonymous callers only get the status; the
+  details (database, disk) are shown to `ADMIN` only. No other Actuator endpoint
+  is exposed over HTTP, and `/actuator/**` requires `ADMIN` in case one ever is.
+- Any authenticated user: `/` and `/usuario/**` (own data, and read-only lists of
+  own bookings and own appointments).
+- `MEDICO` only: registering time slots (`/agenda/form`, `POST /agenda/save`, and
+  in batch: `/agenda/lote`). Neither `ADMIN` nor `ATENDENTE` can.
+- `ATENDENTE` only: booking a slot for a patient
+  (`GET /agendamentos/novo/{agendaId}`, `POST /agendamentos/save`), cancelling
+  (`POST /agendamentos/cancelar/{id}`), rescheduling
+  (`/agendamentos/reagendar/{id}`), confirming attendance
   (`POST /agendamentos/confirmar/{id}`), which is what creates the `Consulta`, and
-  recording a no-show (`POST /agendamentos/falta/{id}`).
-- `ADMIN` only: add/edit/remove doctors, remove patients, and the H2 console.
-- A `PACIENTE` cannot open the patient, doctor, booking management or
-  appointment history pages, so one patient never sees another patient's data.
+  recording a no-show (`POST /agendamentos/falta/{id}`). The `admin` account has
+  this profile too.
+- `ADMIN`, `ATENDENTE` and `MEDICO`: patients, the list of doctors, the available
+  time slots (`/agenda/list`), the booking management page (`/agendamentos/list`),
+  the day schedule (`/agenda/dia`; a `MEDICO` only sees their own) and the
+  appointment history (`/consultas/**`).
+- `ADMIN` only: add/edit/remove doctors, remove patients, the audit log
+  (`/auditoria`) and the H2 console.
+- A `PACIENTE` cannot open the patient, doctor, time slot, booking management or
+  appointment history pages, nor book, cancel or reschedule (`403`), so one
+  patient never sees or changes another patient's data.
   `/usuario/consultas` and `/usuario/agendamentos` take no id: they list what
   belongs to whoever is logged in.
-- Ownership is enforced on the server, not by the forms:
-  - a `PACIENTE` always books for the patient linked to the account; a
-    `pacienteId` sent in the request is ignored (`AgendamentoController.save`);
-  - a `PACIENTE` can only cancel or reschedule their own booking, and only up to
-    24 hours before its time; for anyone else's the answer is `404`, the same as
-    for a booking that does not exist (`AgendamentoService.cancelar`,
-    `AgendamentoService.reagendar`). Who cancelled (login) and when is stored
-    with the booking; staff see it, patients only see the reason;
-  - a `MEDICO` can only register slots in their own schedule, one by one or in
-    batch; a `medicoId` sent in the request is ignored (`AgendaController.save`,
-    `AgendaController.gerarLote`).
+- Ownership is enforced on the server, not by the forms: a `MEDICO` can only
+  register slots in their own schedule, one by one or in batch; a `medicoId` sent
+  in the request is ignored (`AgendaController.save`, `AgendaController.gerarLote`).
+- Who cancelled (login) and when is stored with the booking; staff see it,
+  patients only see the reason.
 - Buttons and menu items are hidden with `sec:authorize` according to the
   profile; the URL rules in `SecurityConfiguration` are what enforce access.
 - A user without the required profile gets `403` (`templates/error/403.html`).
+
+## Brute-force protection and password policy
+
+- After 5 wrong passwords in a row (`TentativasLoginService.LIMITE_TENTATIVAS`) the
+  account is locked for 15 minutes (`DURACAO_BLOQUEIO`). While locked, not even the
+  right password works: Spring Security checks the lock before the password
+  (`UsuarioDetailsService` sets `accountLocked`). The lock ends by itself; a
+  successful login resets the counter. Failures are counted under a pessimistic
+  lock on the user row, so concurrent attempts are not lost.
+- The counting is driven by Spring Security's authentication events
+  (`EventosDeAutenticacao`, published by the `DefaultAuthenticationEventPublisher`
+  bean in `SecurityConfiguration`), for both form login and HTTP Basic.
+- The login page shows the same message for a wrong password, an unknown user and
+  a locked account, so it does not reveal which accounts exist.
+- Passwords need 8 to 72 characters, letters and digits, and must not contain the
+  username (`Credenciais`, `CredenciaisValidator`).
+
+## Security headers
+
+`SecurityConfiguration` sends, besides Spring Security's defaults
+(`X-Content-Type-Options`, `X-Frame-Options: SAMEORIGIN`, cache control, and HSTS on
+HTTPS responses):
+
+- `Content-Security-Policy`: scripts, styles and fonts only from the application
+  and from the Bootstrap CDN (`cdn.jsdelivr.net`), no inline script or style,
+  `object-src 'none'`, `form-action 'self'`. The templates have no inline JavaScript
+  (confirmations use `data-confirmar` and `static/js/confirmar.js`). The H2 console
+  uses inline scripts and is left out of the policy.
+- `Referrer-Policy: strict-origin-when-cross-origin`.
+- `Permissions-Policy` turning off camera, microphone, geolocation and payment.
+
+## Audit log
+
+`RegistroAuditoria` (table `auditoria`) records who did what, when and on which
+record: logins through the form, wrong passwords, account locks, slot
+registration, booking, cancelling, rescheduling, attendance, no-shows, changes to
+appointment notes, patient and doctor registration/edits/removals and LGPD data
+exports. `AuditoriaService.registrar` runs inside the caller's transaction
+(`Propagation.MANDATORY`): if the operation is rolled back, so is the record.
+Login events use `registrarSeparado` (own transaction). The detail identifies the
+record (ids, dates) and never copies health data such as appointment notes. The
+application only inserts audit rows; `/auditoria` (ADMIN only) lists them with
+filters by user, action and period.
+
+## LGPD
+
+- Patient registration requires accepting the privacy policy (`/privacidade`,
+  public). The time of acceptance is stored in `pacientes.consentimento_em`; the
+  field has no setter, so the form cannot fill it. `PacienteService.cadastrar`
+  refuses a registration without consent.
+- `GET /usuario/dados/exportar`: a patient downloads, as JSON, everything the
+  clinic stores about them (registration data, bookings including cancelled ones,
+  appointments). There is no id in the URL: the patient is the one linked to the
+  account. The response is `no-store` and the export is audited. Staff accounts
+  get `404`.
+- Deletion: patients with appointment history are not deleted on request, because
+  medical records must be kept (Lei 13.787/2018). The policy page explains this.
+  The policy text is a template: the clinic must review it and fill in the
+  controller and data protection officer contacts before real use.
 
 ## Login, logout and HTTP Basic
 
@@ -101,7 +176,7 @@ remember-me cookies stop being valid.
   was requested, or to `/` when there was none.
 - Logout is a CSRF-protected POST to `/logout` and redirects to `/login?logout`.
 - HTTP Basic is also enabled, for tools such as curl:
-  `curl -u user:User123 http://localhost:8080/pacientes/list`.
+  `curl -u atendente:Atendente123 http://localhost:8080/pacientes/list`.
   Unauthenticated browsers (requests that accept HTML) are still redirected to
   `/login`; other clients receive `401` with a `WWW-Authenticate: Basic` header.
 - `/usuario/dados` shows the authenticated user's login, status, profiles and

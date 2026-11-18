@@ -71,7 +71,7 @@ public class AgendaController {
     /**
      * Agenda do dia: todos os horários de uma data, por médico, com o paciente e as ações
      * (confirmar presença, falta, cancelar). Sem data, mostra hoje; data inválida também.
-     * O médico vê só a própria agenda; administração e recepção podem filtrar por médico.
+     * O médico vê só a própria agenda; administração e atendimento podem filtrar por médico.
      */
     @GetMapping("/dia")
     public ModelAndView dia(@RequestParam(name = "data", required = false) String dataInformada,
@@ -129,11 +129,7 @@ public class AgendaController {
     public ModelAndView save(@Valid @ModelAttribute("form") AgendaForm form, BindingResult result,
                              Authentication autenticacao, ModelMap model, RedirectAttributes attributes) {
         // O médico só cadastra horários para si: o id enviado pelo formulário é descartado.
-        Medico medicoAutenticado = medicoRestrito(autenticacao);
-        if (medicoAutenticado != null)
-            form.setMedicoId(medicoAutenticado.getId());
-        else if (form.getMedicoId() == null && !result.hasFieldErrors("medicoId"))
-            result.rejectValue("medicoId", "NotNull", "Selecione o médico.");
+        form.setMedicoId(medicoAutenticado(autenticacao).getId());
 
         if (result.hasErrors())
             return formulario(autenticacao, model);
@@ -163,11 +159,7 @@ public class AgendaController {
     public ModelAndView gerarLote(@Valid @ModelAttribute("form") AgendaLoteForm form, BindingResult result,
                                   Authentication autenticacao, ModelMap model, RedirectAttributes attributes) {
         // Mesma regra do cadastro individual: o médico só gera horários na própria agenda.
-        Medico medicoAutenticado = medicoRestrito(autenticacao);
-        if (medicoAutenticado != null)
-            form.setMedicoId(medicoAutenticado.getId());
-        else if (form.getMedicoId() == null && !result.hasFieldErrors("medicoId"))
-            result.rejectValue("medicoId", "NotNull", "Selecione o médico.");
+        form.setMedicoId(medicoAutenticado(autenticacao).getId());
 
         if (result.hasErrors())
             return formularioLote(autenticacao, model);
@@ -202,23 +194,20 @@ public class AgendaController {
     }
 
     private ModelAndView formulario(Authentication autenticacao, ModelMap model) {
-        Medico medicoAutenticado = medicoRestrito(autenticacao);
-        if (medicoAutenticado != null)
-            model.addAttribute("medicoAutenticado", medicoAutenticado);
-        else
-            model.addAttribute("medicos", medicoService.listar());
-
+        model.addAttribute("medicoAutenticado", medicoAutenticado(autenticacao));
         return new ModelAndView("agenda/formulario", model);
     }
 
     /**
-     * Para quem tem só o perfil MEDICO, devolve o médico dono da conta; para a administração
-     * e a recepção, que escolhem o médico no formulário, devolve null.
+     * Na agenda do dia, administração e atendimento veem todos os médicos (devolve null);
+     * o médico vê só a própria agenda.
      */
     private Medico medicoRestrito(Authentication autenticacao) {
-        if (Papeis.daAdministracao(autenticacao))
-            return null;
+        return Papeis.daAdministracao(autenticacao) ? null : medicoAutenticado(autenticacao);
+    }
 
+    /** O médico dono da conta. Só o perfil MEDICO cadastra horários (SecurityConfiguration). */
+    private Medico medicoAutenticado(Authentication autenticacao) {
         return medicoService.buscarPorLogin(autenticacao.getName())
                 .orElseThrow(() -> new AccessDeniedException("Conta sem médico vinculado."));
     }

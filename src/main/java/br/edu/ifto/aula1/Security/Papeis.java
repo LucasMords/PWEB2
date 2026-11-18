@@ -11,14 +11,9 @@ public final class Papeis {
     private Papeis() {
     }
 
-    /** ADMIN, USER (recepção) ou MEDICO: quem trabalha na clínica. */
-    public static boolean daEquipe(Authentication autenticacao) {
-        return temAlgum(autenticacao, Perfil.ADMIN, Perfil.USER, Perfil.MEDICO);
-    }
-
-    /** ADMIN ou USER: quem pode agir em nome de qualquer médico ou paciente. */
+    /** ADMIN ou ATENDENTE: quem vê a agenda de todos os médicos. */
     public static boolean daAdministracao(Authentication autenticacao) {
-        return temAlgum(autenticacao, Perfil.ADMIN, Perfil.USER);
+        return temAlgum(autenticacao, Perfil.ADMIN, Perfil.ATENDENTE);
     }
 
     public static boolean temAlgum(Authentication autenticacao, String... perfis) {

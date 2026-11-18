@@ -1,5 +1,6 @@
 package br.edu.ifto.aula1.Service;
 
+import br.edu.ifto.aula1.Model.Entity.AcaoAuditoria;
 import br.edu.ifto.aula1.Model.Entity.Consulta;
 import br.edu.ifto.aula1.Model.repository.ConsultaRepository;
 import org.springframework.stereotype.Service;
@@ -16,9 +17,11 @@ import java.util.List;
 public class ConsultaService {
 
     private final ConsultaRepository repository;
+    private final AuditoriaService auditoria;
 
-    public ConsultaService(ConsultaRepository repository) {
+    public ConsultaService(ConsultaRepository repository, AuditoriaService auditoria) {
         this.repository = repository;
+        this.auditoria = auditoria;
     }
 
     public List<Consulta> listar() {
@@ -50,6 +53,8 @@ public class ConsultaService {
     public Consulta atualizarObservacoes(Long id, String observacoes) {
         Consulta consulta = buscar(id);
         consulta.setObservacoes(observacoes == null || observacoes.isBlank() ? null : observacoes.trim());
+        // O texto das observações é dado de saúde: a auditoria registra só que houve alteração.
+        auditoria.registrar(AcaoAuditoria.CONSULTA_ALTERADA, "Consulta", consulta.getId(), null);
         return consulta;
     }
 }

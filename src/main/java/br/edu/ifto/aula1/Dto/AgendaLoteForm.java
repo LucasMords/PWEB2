@@ -20,7 +20,7 @@ import java.util.Set;
  */
 public class AgendaLoteForm {
 
-    // Sem @NotNull pelo mesmo motivo do AgendaForm: para o médico, o id vem da conta autenticada.
+    // Sem @NotNull pelo mesmo motivo do AgendaForm: o id vem da conta do médico autenticado.
     private Long medicoId;
 
     @NotNull(message = "Informe a data inicial.")

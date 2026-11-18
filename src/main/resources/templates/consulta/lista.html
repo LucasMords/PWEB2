@@ -10,7 +10,7 @@
         <h1 class="h3 mb-0" th:text="${titulo}">Consultas</h1>
         <!-- A consulta nasce da confirmação de presença, feita na tela de agendamentos. -->
         <a class="btn btn-outline-secondary" th:href="@{/agendamentos/list}"
-           sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Ver agendamentos</a>
+           sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Ver agendamentos</a>
     </div>
 
     <div th:replace="~{fragments/layout :: mensagem}"></div>
@@ -30,7 +30,7 @@
                     <th>Médico</th>
                     <th>Agendamento</th>
                     <th>Observações</th>
-                    <th sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">Ações</th>
+                    <th sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Ações</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -44,7 +44,7 @@
                               th:text="|Horário marcado: ${#temporals.format(consulta.agendamento.agenda.dataHora, 'dd/MM/yyyy HH:mm')}|"></span>
                     </td>
                     <td th:text="${consulta.observacoes}"></td>
-                    <td sec:authorize="hasAnyRole('ADMIN','USER','MEDICO')">
+                    <td sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">
                         <a class="btn btn-sm btn-outline-secondary"
                            th:href="@{/consultas/edit/{id}(id=${consulta.id})}">Observações</a>
                     </td>

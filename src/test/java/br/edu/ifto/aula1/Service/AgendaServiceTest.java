@@ -54,11 +54,12 @@ class AgendaServiceTest {
 
     @Mock private AgendaRepository repository;
     @Mock private MedicoService medicoService;
+    @Mock private AuditoriaService auditoria;
     private AgendaService service;
 
     @BeforeEach
     void preparar() {
-        service = new AgendaService(repository, medicoService, Clock.fixed(AGORA.atZone(FUSO).toInstant(), FUSO));
+        service = new AgendaService(repository, medicoService, auditoria, Clock.fixed(AGORA.atZone(FUSO).toInstant(), FUSO));
     }
 
     // ---------- Cadastro de um horário ----------

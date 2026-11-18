@@ -3,6 +3,7 @@ package br.edu.ifto.aula1.Service;
 import br.edu.ifto.aula1.Dto.AgendaFiltro;
 import br.edu.ifto.aula1.Dto.AgendaForm;
 import br.edu.ifto.aula1.Dto.AgendaLoteForm;
+import br.edu.ifto.aula1.Model.Entity.AcaoAuditoria;
 import br.edu.ifto.aula1.Model.Entity.Agenda;
 import br.edu.ifto.aula1.Model.Entity.Medico;
 import br.edu.ifto.aula1.Model.Entity.StatusAgenda;
@@ -40,9 +41,12 @@ public class AgendaService {
 
     private final AgendaRepository repository;
     private final MedicoService medicoService;
+    private final AuditoriaService auditoria;
     private final Clock clock;
 
-    public AgendaService(AgendaRepository repository, MedicoService medicoService, Clock clock) {
+    public AgendaService(AgendaRepository repository, MedicoService medicoService,
+                         AuditoriaService auditoria, Clock clock) {
+        this.auditoria = auditoria;
         this.repository = repository;
         this.medicoService = medicoService;
         this.clock = clock;
@@ -102,7 +106,10 @@ public class AgendaService {
 
         try {
             // O flush antecipa o INSERT para que a restrição única do banco seja conferida aqui.
-            return repository.saveAndFlush(new Agenda(medico, data, horario));
+            Agenda agenda = repository.saveAndFlush(new Agenda(medico, data, horario));
+            auditoria.registrar(AcaoAuditoria.HORARIO_CADASTRADO, "Agenda", agenda.getId(),
+                    "Médico " + medico.getId() + ", " + data + " " + horario);
+            return agenda;
         } catch (DataIntegrityViolationException e) {
             // Dois cadastros simultâneos do mesmo horário: o segundo é barrado pela restrição única.
             log.warn("Cadastro simultâneo do mesmo horário barrado pelo banco: médico {}, {} {}",
@@ -161,6 +168,9 @@ public class AgendaService {
 
         log.info("Lote gerado para o médico {}: {} horários criados, {} ignorados",
                 medico.getId(), novos.size(), ignorados);
+        auditoria.registrar(AcaoAuditoria.HORARIOS_GERADOS, "Medico", medico.getId(),
+                novos.size() + " horários de " + form.getDataInicio() + " a " + form.getDataFim()
+                        + " (" + ignorados + " ignorados)");
         return new ResultadoLote(novos.size(), ignorados);
     }
 

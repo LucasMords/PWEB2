@@ -59,7 +59,8 @@ class CadastroComContaIntegrationTests {
         mvc.perform(post("/pacientes/save").with(csrf())
                         .param("nome", "Joana Prado").param("cpf", "11144477735")
                         .param("dataNascimento", "1990-03-20")
-                        .param("login", "joana.prado").param("senha", "Joana-123"))
+                        .param("login", "joana.prado").param("senha", "Joana-123")
+                        .param("consentimento", "true"))
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login"))
                 .andExpect(flash().attributeExists("mensagem"));
 
@@ -127,7 +128,7 @@ class CadastroComContaIntegrationTests {
         mvc.perform(post("/pacientes/save").with(csrf())
                         .param("nome", "Rui Farias").param("cpf", "16899535009")
                         .param("dataNascimento", "1979-11-05")
-                        .param("login", "rui.farias").param("senha", "Rui-12345")
+                        .param("login", "rui.farias").param("senha", "Rui-12345").param("consentimento", "true")
                         // Tentativas de se promover ou de mexer na entidade Usuario.
                         .param("perfil", "ADMIN").param("usuario.login", "invasor")
                         .param("usuario.perfis[0].nome", "ADMIN"))
@@ -146,11 +147,11 @@ class CadastroComContaIntegrationTests {
         // Só o ADMIN cria médicos: visitante vai para o login e a recepção recebe 403.
         mvc.perform(comParametros(dados).accept(MediaType.TEXT_HTML))
                 .andExpect(redirectedUrl("/login"));
-        mvc.perform(comParametros(dados).with(user("user").roles("USER")))
+        mvc.perform(comParametros(dados).with(user("atendente").roles("ATENDENTE")))
                 .andExpect(status().isForbidden());
         assertThat(usuarios.existsByLogin("caio.braga")).isFalse();
 
-        mvc.perform(comParametros(dados).with(user("admin").roles("ADMIN", "USER")))
+        mvc.perform(comParametros(dados).with(user("admin").roles("ADMIN", "ATENDENTE")))
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/medicos/list"));
 
         assertThat(usuarios.findComPerfisByLogin("caio.braga").orElseThrow().getPerfis())
@@ -210,10 +211,10 @@ class CadastroComContaIntegrationTests {
         Credenciais credenciais = new Credenciais();
         credenciais.setLogin("lia.temporaria");
         credenciais.setSenha("Lia-12345");
-        Long id = pacienteService.cadastrar(paciente, credenciais).getId();
+        Long id = pacienteService.cadastrar(paciente, credenciais, true).getId();
         assertThat(usuarios.existsByLogin("lia.temporaria")).isTrue();
 
-        mvc.perform(post("/pacientes/remove/" + id).with(csrf()).with(user("admin").roles("ADMIN", "USER")))
+        mvc.perform(post("/pacientes/remove/" + id).with(csrf()).with(user("admin").roles("ADMIN", "ATENDENTE")))
                 .andExpect(status().is3xxRedirection());
 
         assertThat(pacientes.existsById(id)).isFalse();
@@ -222,7 +223,7 @@ class CadastroComContaIntegrationTests {
 
     @Test
     void edicaoNaoMexeNaContaENaoPedeCredenciais() throws Exception {
-        var recepcao = user("user").roles("USER");
+        var recepcao = user("atendente").roles("ATENDENTE");
 
         mvc.perform(get("/pacientes/edit/1").with(recepcao))
                 .andExpect(status().isOk())

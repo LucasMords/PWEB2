@@ -33,16 +33,10 @@
 
                     <dt class="col-sm-3">Horário</dt>
                     <dd class="col-sm-9" th:text="${#temporals.format(agenda.horario, 'HH:mm')}"></dd>
-
-                    <!-- O paciente autenticado agenda para si: o servidor usa a conta, não um campo -->
-                    <th:block th:if="${pacienteAutenticado != null}">
-                        <dt class="col-sm-3">Paciente</dt>
-                        <dd class="col-sm-9" th:text="${pacienteAutenticado.nome}"></dd>
-                    </th:block>
                 </dl>
 
-                <!-- A equipe escolhe para qual paciente é o agendamento -->
-                <div class="mb-3" th:if="${pacienteAutenticado == null}">
+                <!-- O atendente escolhe para qual paciente é o agendamento -->
+                <div class="mb-3">
                     <label class="form-label" for="pacienteId">Paciente</label>
                     <select class="form-select" th:field="*{pacienteId}" th:errorclass="is-invalid">
                         <option value="">Selecione</option>

@@ -1,5 +1,6 @@
 package br.edu.ifto.aula1.Service;
 
+import br.edu.ifto.aula1.Model.Entity.AcaoAuditoria;
 import br.edu.ifto.aula1.Model.Entity.Paciente;
 import br.edu.ifto.aula1.Model.Entity.Perfil;
 import br.edu.ifto.aula1.Model.repository.AgendamentoRepository;
@@ -9,6 +10,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,12 +22,17 @@ public class PacienteService {
     private final PacienteRepository repository;
     private final UsuarioService usuarioService;
     private final AgendamentoRepository agendamentoRepository;
+    private final AuditoriaService auditoria;
+    private final Clock clock;
 
     public PacienteService(PacienteRepository repository, UsuarioService usuarioService,
-                           AgendamentoRepository agendamentoRepository) {
+                           AgendamentoRepository agendamentoRepository, AuditoriaService auditoria,
+                           Clock clock) {
         this.repository = repository;
         this.usuarioService = usuarioService;
         this.agendamentoRepository = agendamentoRepository;
+        this.auditoria = auditoria;
+        this.clock = clock;
     }
 
     public List<Paciente> listar() {
@@ -61,13 +69,25 @@ public class PacienteService {
     /**
      * Cadastra o paciente junto com a conta de acesso dele, na mesma transação:
      * se um dos dois falhar, nenhum é gravado. O papel inicial é PACIENTE.
+     * LGPD: sem o aceite da política de privacidade, o cadastro não é feito; o momento do
+     * aceite fica registrado no paciente.
      */
     @Transactional
-    public Paciente cadastrar(Paciente paciente, Credenciais credenciais) {
+    public Paciente cadastrar(Paciente paciente, Credenciais credenciais, boolean consentimento) {
+        if (!consentimento)
+            throw new RegraNegocioException("consentimento", CONSENTIMENTO_OBRIGATORIO);
+
         paciente.setId(null);
         paciente.vincularUsuario(usuarioService.criar(credenciais, Perfil.PACIENTE));
-        return repository.save(paciente);
+        paciente.registrarConsentimento(LocalDateTime.now(clock));
+        Paciente salvo = repository.save(paciente);
+        auditoria.registrar(AcaoAuditoria.PACIENTE_CADASTRADO, "Paciente", salvo.getId(),
+                "Conta " + credenciais.getLogin());
+        return salvo;
     }
+
+    public static final String CONSENTIMENTO_OBRIGATORIO =
+            "É preciso aceitar a política de privacidade para concluir o cadastro.";
 
     /**
      * Copia os dados do formulário para o paciente do banco. Não é preciso chamar save():
@@ -83,6 +103,7 @@ public class PacienteService {
         paciente.setTelefone(dados.getTelefone());
         paciente.setEmail(dados.getEmail());
 
+        auditoria.registrar(AcaoAuditoria.PACIENTE_ALTERADO, "Paciente", paciente.getId(), null);
         return paciente;
     }
 
@@ -97,5 +118,6 @@ public class PacienteService {
             throw new RegraNegocioException("Não é possível excluir um paciente que tem agendamentos registrados.");
 
         repository.delete(paciente);
+        auditoria.registrar(AcaoAuditoria.PACIENTE_EXCLUIDO, "Paciente", id, null);
     }
 }
