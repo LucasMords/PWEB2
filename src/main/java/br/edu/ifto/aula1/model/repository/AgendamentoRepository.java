@@ -79,7 +79,7 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
               join fetch ag.paciente p
             where (:pacienteId is null or p.id = :pacienteId)
               and (:medicoId is null or m.id = :medicoId)
-              and (:data is null or a.data = :data)
+              and (cast(:data as LocalDate) is null or a.data = :data)
               and (:status is null or ag.status = :status)
             order by a.data desc, a.horario desc, ag.id desc
             """,
@@ -88,7 +88,7 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
               join ag.agenda a
             where (:pacienteId is null or ag.paciente.id = :pacienteId)
               and (:medicoId is null or a.medico.id = :medicoId)
-              and (:data is null or a.data = :data)
+              and (cast(:data as LocalDate) is null or a.data = :data)
               and (:status is null or ag.status = :status)
             """)
     Page<Agendamento> buscar(@Param("pacienteId") Long pacienteId,

@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
  * A reserva de um horário da agenda por um paciente.
  *
  * Um mesmo horário pode ter vários agendamentos ao longo do tempo (os cancelados ficam
- * como histórico), mas só um ativo. O H2 não tem índice único parcial (unique ... where
+ * como histórico), mas só um ativo. O H2 dos testes não tem índice único parcial (unique ... where
  * status diferente de CANCELADO), então a regra é garantida pela coluna reserva_ativa:
  * ela vale TRUE enquanto o agendamento ocupa o horário e NULL depois de cancelado. Como o
  * banco não considera dois NULL iguais, a restrição única (agenda_id, reserva_ativa)

@@ -5,13 +5,38 @@ Aplicacao Spring Boot para gerenciamento de pacientes, medicos e consultas. Demo
 ## Tecnologias e modelo
 
 - Java 25, Spring Boot, Spring Web MVC e Thymeleaf
-- Spring Data JPA / Hibernate e H2 em memoria
+- Spring Data JPA / Hibernate e PostgreSQL, com o esquema versionado pelo Flyway
 - Bean Validation (Jakarta Validation / Hibernate Validator)
 - Bootstrap 5.3 (via CDN) com fragmentos Thymeleaf para o layout
 - `Medico 1:N Agenda`, `Agenda 1:N Agendamento`, `Paciente 1:N Agendamento` e `Agendamento 1:0..1 Consulta`
 - A consulta so existe depois que a clinica confirma a presenca do paciente; paciente e medico dela vem do agendamento (veja "Agenda, agendamentos e consultas")
 
-As tabelas sao recriadas ao iniciar e preenchidas por `src/main/resources/import.sql`.
+## Banco de dados
+
+O banco e o PostgreSQL e os dados persistem entre execucoes. As tabelas sao criadas e
+evoluidas pelo Flyway, nunca pelo Hibernate (que so confere, ao subir, se as entidades
+batem com as tabelas: `ddl-auto=validate`):
+
+- `src/main/resources/db/migration`: o esquema (`V1__esquema_inicial.sql`) e os perfis.
+  Toda mudanca de tabela entra num arquivo novo (`V2__...`); um arquivo ja aplicado nunca
+  e editado.
+- `src/main/resources/db/demo`: pacientes, medicos e agenda de exemplo. So entram em
+  desenvolvimento e nos testes; o perfil `prod` nao carrega esta pasta.
+
+A conexao vem das variaveis de ambiente `DB_URL` (padrao
+`jdbc:postgresql://localhost:5432/clinica`), `DB_USUARIO` (padrao `clinica`) e `DB_SENHA`.
+
+**Instalacao local (Windows).** O PostgreSQL 18 foi instalado como servico do Windows
+(`postgresql-x64-18`, porta 5432), com o banco `clinica` e o usuario `clinica`, dono do
+banco. As tres variaveis acima estao definidas no ambiente do usuario do Windows.
+
+**Backup.** `scripts\backup-banco.ps1` (instalacao local) e `scripts/backup-docker.sh`
+(Docker Compose) gravam um `pg_dump` compactado em `backups/` e mantem os 14 mais
+recentes; os comandos de restauracao estao no inicio de cada script. Para backup diario,
+agende o script (Agendador de Tarefas do Windows ou cron).
+
+Para comecar do zero em desenvolvimento, apague e recrie o banco `clinica`; o Flyway
+recria as tabelas e os dados de exemplo na proxima execucao.
 
 ## Execucao
 
@@ -19,9 +44,13 @@ As tabelas sao recriadas ao iniciar e preenchidas por `src/main/resources/import
 mvnw.cmd spring-boot:run
 ```
 
-Abra `http://localhost:8080`. O console H2 fica em `/h2-console` (URL `jdbc:h2:mem:clinica`, usuario `sa`, sem senha).
+Abra `http://localhost:8080`. As contas de exemplo estao no `SECURITY.md`.
 
-Testes: `mvnw.cmd test`.
+Testes: `mvnw.cmd test`. Eles rodam num H2 em memoria no modo PostgreSQL, com as mesmas
+migracoes (`src/test/resources/config/application.properties`), e nao precisam do banco
+instalado. No CI rodam contra um PostgreSQL de verdade; para fazer o mesmo localmente,
+defina `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` e `SPRING_DATASOURCE_PASSWORD`
+apontando para um banco vazio.
 
 ## Operacao
 
@@ -30,16 +59,20 @@ como usuario sem privilegios, com as camadas do Spring Boot separadas (bibliotec
 cache, so as classes mudam a cada build):
 
 ```cmd
+copy .env.exemplo .env
 docker compose up --build
 ```
 
-A imagem ativa o perfil `prod` (`application-prod.properties`): sem SQL no log, sem
-console H2, cache de templates ligado, logs em JSON (formato ECS, uma linha por evento) e
+O Compose sobe a aplicacao e um PostgreSQL 18, com os dados num volume. As senhas ficam
+no `.env` (fora do git): `DB_SENHA`, `CLINICA_SENHA_ADMIN` (obrigatoria: a conta `admin`
+e criada com ela na primeira execucao) e, opcional, `CLINICA_SENHA_ATENDENTE`.
+
+A imagem ativa o perfil `prod` (`application-prod.properties`): so as migracoes do
+esquema, sem dados de exemplo, sem SQL no log, cache de templates ligado, logs em JSON (formato ECS, uma linha por evento) e
 cookie de sessao `Secure`. Os logs tambem vao para `logs/clinica.log` (JSON, com rotacao
 a cada 10 MB ou por dia, guardados por 14 dias e ate 500 MB no total; o caminho muda com a
 variavel `LOG_ARQUIVO`); no Compose, a pasta e um volume. O HTTPS fica num proxy reverso na frente da aplicacao; os
-cabecalhos `X-Forwarded-*` sao respeitados. O banco ainda e o H2 em memoria, entao os
-dados se perdem quando o container reinicia.
+cabecalhos `X-Forwarded-*` sao respeitados.
 
 **Health check.** `GET /actuator/health` (publico) responde `{"status":"UP"}`;
 `/actuator/health/liveness` e `/actuator/health/readiness` servem para orquestradores.
@@ -47,9 +80,9 @@ So o ADMIN ve os detalhes (banco, disco). Nenhum outro endpoint do Actuator e ex
 `HEALTHCHECK` do Dockerfile usa o liveness.
 
 **CI.** `.github/workflows/ci.yml` roda a cada push na `master` e em pull requests: compila
-e executa todos os testes (`mvnw verify`, com os relatorios anexados se falhar), depois
-gera a imagem Docker, sobe o container e espera o health check responder. Nada e
-publicado.
+e executa todos os testes contra um PostgreSQL 18 (`mvnw verify`, com os relatorios
+anexados se falhar), depois sobe aplicacao e banco com o Docker Compose, espera o health
+check e confere o login do admin. Nada e publicado.
 
 **Erros.** Erros inesperados mostram uma pagina generica (`templates/error/5xx.html`);
 o detalhe tecnico fica so no log.
@@ -104,12 +137,12 @@ Quem faz o que: o **medico** cadastra os horarios disponiveis da propria agenda;
 Integridade e concorrencia:
 
 - Restricoes unicas no banco: `agendas (medico_id, data, horario)`, `consultas (agendamento_id)` e `agendamentos (agenda_id, reserva_ativa)`.
-- O H2 nao tem indice unico parcial, entao "no maximo um agendamento ativo por horario" usa a coluna `reserva_ativa`: `TRUE` enquanto o agendamento ocupa o horario e `NULL` depois de cancelado. Como o banco nao trata dois `NULL` como iguais, cabem varios cancelados e um unico ativo por horario.
+- "No maximo um agendamento ativo por horario" usa a coluna `reserva_ativa` (e nao um indice unico parcial, que o H2 dos testes nao tem): `TRUE` enquanto o agendamento ocupa o horario e `NULL` depois de cancelado. Como o banco nao trata dois `NULL` como iguais, cabem varios cancelados e um unico ativo por horario.
 - Cada escrita comeca lendo com bloqueio pessimista (`SELECT ... FOR UPDATE`, `@Lock(PESSIMISTIC_WRITE)`) o registro que decide a regra: a `Agenda` ao reservar, o `Agendamento` ao cancelar ou confirmar. Dois pacientes disputando o mesmo horario sao atendidos em fila e o segundo recebe "Este horario nao esta mais disponivel". As restricoes unicas ficam como segunda barreira.
 - As regras ficam nos servicos (`AgendaService`, `AgendamentoService`), que lancam `RegraNegocioException`. O `RegraNegocioAdvice` (`@ControllerAdvice`) transforma a excecao em mensagem de erro e redireciona para a listagem; no formulario de horario ela aparece no campo correspondente.
 - Medico com horarios na agenda e paciente com agendamentos nao podem ser excluidos, para preservar o historico.
 - As regras de horario leem a hora por um `java.time.Clock` (bean em `Config.RelogioConfig`), e nao por `LocalDateTime.now()` direto, para que os testes possam fixar o "agora". Na tela, os botoes de confirmar, registrar falta e cancelar so ficam habilitados quando a acao cabe no status e no horario; o servico confere tudo de novo.
-- O `import.sql` inclui um agendamento de ontem ainda pendente (Ana com o Dr. Eduardo), para demonstrar a confirmacao de presenca e o registro de falta.
+- Os dados de demonstracao (`db/demo`) incluem um agendamento da vespera da migracao ainda pendente (Ana com o Dr. Eduardo), para demonstrar a confirmacao de presenca e o registro de falta.
 
 ## Seguranca e LGPD
 

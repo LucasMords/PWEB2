@@ -1,5 +1,6 @@
-# Compila e roda todos os testes a cada push e pull request; depois confere se a imagem
-# Docker ainda e gerada. Nada e publicado.
+# Compila e roda todos os testes contra um PostgreSQL de verdade a cada push e pull
+# request; depois sobe a aplicacao com o Docker Compose (aplicacao + banco) e espera o
+# health check. Nada e publicado.
 name: CI
 
 on:
@@ -13,6 +14,23 @@ permissions:
 jobs:
   testes:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: clinica_teste
+          POSTGRES_USER: clinica
+          POSTGRES_PASSWORD: senha-do-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clinica -d clinica_teste"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Sobrepoe o H2 dos testes (src/test/resources/config/application.properties).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/clinica_teste
+      SPRING_DATASOURCE_USERNAME: clinica
+      SPRING_DATASOURCE_PASSWORD: senha-do-ci
     steps:
       - uses: actions/checkout@v4
 
@@ -38,18 +56,27 @@ jobs:
   imagem-docker:
     needs: testes
     runs-on: ubuntu-latest
+    env:
+      DB_SENHA: senha-do-ci
+      CLINICA_SENHA_ADMIN: SenhaDoCi123
     steps:
       - uses: actions/checkout@v4
 
-      - name: Gerar a imagem
-        run: docker build -t clinica:ci .
+      - name: Subir aplicacao e banco
+        run: docker compose up -d --build
 
-      - name: Subir o container e esperar o health check
+      - name: Esperar o health check
         run: |
-          docker run -d --name clinica -p 8080:8080 clinica:ci
-          for i in $(seq 1 30); do
+          for i in $(seq 1 40); do
             if curl -fsS http://localhost:8080/actuator/health; then exit 0; fi
             sleep 3
           done
-          docker logs clinica
+          docker compose logs
           exit 1
+
+      - name: Conferir o login do admin
+        run: curl -fsS -u admin:SenhaDoCi123 http://localhost:8080/actuator/health | grep -q '"db"'
+
+      - name: Derrubar
+        if: always()
+        run: docker compose down -v

@@ -18,8 +18,8 @@ public interface RegistroAuditoriaRepository extends JpaRepository<RegistroAudit
             select r from RegistroAuditoria r
             where (:usuario is null or r.usuario = :usuario)
               and (:acao is null or r.acao = :acao)
-              and (:inicio is null or r.dataHora >= :inicio)
-              and (:fim is null or r.dataHora < :fim)
+              and (cast(:inicio as LocalDateTime) is null or r.dataHora >= :inicio)
+              and (cast(:fim as LocalDateTime) is null or r.dataHora < :fim)
             order by r.dataHora desc, r.id desc
             """)
     Page<RegistroAuditoria> buscar(@Param("usuario") String usuario,

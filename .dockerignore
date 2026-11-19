@@ -8,3 +8,6 @@ target/
 *.iml
 Dockerfile
 docker-compose.yml
+.env
+backups/
+logs/

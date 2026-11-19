@@ -58,7 +58,7 @@ public class Paciente {
 
     // Conta de acesso do paciente. Fica sem getter/setter de propósito: assim o formulário
     // não consegue preencher nada dela; quem a vincula é o serviço, em vincularUsuario().
-    // Pacientes antigos (import.sql) não têm conta, por isso a coluna aceita null.
+    // A coluna aceita null: um paciente pode existir sem conta de acesso.
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
     @JoinColumn(name = "usuario_id", unique = true)
     private Usuario usuario;

@@ -56,7 +56,7 @@ public interface AgendaRepository extends JpaRepository<Agenda, Long> {
             where a.status = :status
               and (a.data > :hoje or (a.data = :hoje and a.horario > :agora))
               and (:medicoId is null or m.id = :medicoId)
-              and (:data is null or a.data = :data)
+              and (cast(:data as LocalDate) is null or a.data = :data)
               and (:especialidade is null or m.especialidade = :especialidade)
             order by a.data, a.horario, m.nome, a.id
             """,
@@ -65,7 +65,7 @@ public interface AgendaRepository extends JpaRepository<Agenda, Long> {
             where a.status = :status
               and (a.data > :hoje or (a.data = :hoje and a.horario > :agora))
               and (:medicoId is null or m.id = :medicoId)
-              and (:data is null or a.data = :data)
+              and (cast(:data as LocalDate) is null or a.data = :data)
               and (:especialidade is null or m.especialidade = :especialidade)
             """)
     Page<Agenda> buscarFuturos(@Param("status") StatusAgenda status,

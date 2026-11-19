@@ -37,7 +37,7 @@ public class Usuario {
 
     // Proteção contra tentativa e erro de senha: depois de algumas falhas seguidas, a conta
     // fica bloqueada por um tempo (ver TentativasLoginService). O default no banco permite
-    // que o import.sql insira contas sem informar estas colunas.
+    // que os dados de demonstração (db/demo) insiram contas sem informar estas colunas.
     @ColumnDefault("0")
     @Column(name = "tentativas_falhas", nullable = false)
     private int tentativasFalhas = 0;

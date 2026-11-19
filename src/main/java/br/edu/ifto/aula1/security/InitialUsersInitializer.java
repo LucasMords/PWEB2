@@ -4,6 +4,9 @@ import br.edu.ifto.aula1.model.entity.Perfil;
 import br.edu.ifto.aula1.model.entity.Usuario;
 import br.edu.ifto.aula1.model.repository.PerfilRepository;
 import br.edu.ifto.aula1.model.repository.UsuarioRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -11,25 +14,33 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cadastra os usuários da equipe (admin e atendente) ao subir a aplicação.
- * O banco H2 é recriado a cada execução, por isso o cadastro roda sempre.
- * Os perfis são gravados sem o prefixo ROLE_ e as senhas como hash BCrypt.
+ * Cria as contas da equipe (admin e atendente) na primeira vez que a aplicação sobe num
+ * banco novo; depois disso, não faz nada (as contas já existem e as senhas podem ter sido
+ * trocadas). As senhas vêm das propriedades clinica.usuarios-iniciais.*: em desenvolvimento
+ * têm um valor padrão, em produção vêm do ambiente. Senha vazia = a conta não é criada.
  *
- * O import.sql roda antes e já insere os perfis e as contas dos pacientes e médicos
- * de exemplo; aqui só é criado o que ainda não existir.
+ * Os perfis vêm da migração V1 do Flyway; aqui só são garantidos caso faltem.
  */
 @Component
 public class InitialUsersInitializer implements ApplicationRunner {
 
+    private static final Logger log = LoggerFactory.getLogger(InitialUsersInitializer.class);
+
     private final PerfilRepository perfis;
     private final UsuarioRepository usuarios;
     private final PasswordEncoder passwordEncoder;
+    private final String senhaAdmin;
+    private final String senhaAtendente;
 
     public InitialUsersInitializer(PerfilRepository perfis, UsuarioRepository usuarios,
-                                   PasswordEncoder passwordEncoder) {
+                                   PasswordEncoder passwordEncoder,
+                                   @Value("${clinica.usuarios-iniciais.senha-admin}") String senhaAdmin,
+                                   @Value("${clinica.usuarios-iniciais.senha-atendente:}") String senhaAtendente) {
         this.perfis = perfis;
         this.usuarios = usuarios;
         this.passwordEncoder = passwordEncoder;
+        this.senhaAdmin = senhaAdmin;
+        this.senhaAtendente = senhaAtendente;
     }
 
     @Override
@@ -38,13 +49,12 @@ public class InitialUsersInitializer implements ApplicationRunner {
         Perfil admin = criarPerfil(Perfil.ADMIN);
         Perfil atendente = criarPerfil(Perfil.ATENDENTE);
         // Papéis iniciais das contas criadas nos cadastros de médico e de paciente.
-        // Já vêm do import.sql; ficam garantidos aqui caso ele mude.
         criarPerfil(Perfil.MEDICO);
         criarPerfil(Perfil.PACIENTE);
 
         // A administração também atende: marca, cancela e confirma agendamentos.
-        criarUsuario("admin", "Admin123", admin, atendente);
-        criarUsuario("atendente", "Atendente123", atendente);
+        criarUsuario("admin", senhaAdmin, admin, atendente);
+        criarUsuario("atendente", senhaAtendente, atendente);
     }
 
     private Perfil criarPerfil(String nome) {
@@ -52,10 +62,11 @@ public class InitialUsersInitializer implements ApplicationRunner {
     }
 
     private void criarUsuario(String login, String senha, Perfil... papeis) {
-        if (usuarios.existsByLogin(login)) return;
+        if (senha == null || senha.isBlank() || usuarios.existsByLogin(login)) return;
 
         Usuario usuario = new Usuario(login, passwordEncoder.encode(senha), true);
         for (Perfil perfil : papeis) usuario.adicionarPerfil(perfil);
         usuarios.save(usuario);
+        log.info("Conta inicial '{}' criada.", login);
     }
 }

@@ -169,7 +169,7 @@ class CadastroComContaIntegrationTests {
 
     @Test
     void pacientesEMedicosDoImportSqlJaTemContaEVeemAsPropriasConsultas() throws Exception {
-        // Os hashes do import.sql correspondem às senhas documentadas e cada conta tem um só perfil.
+        // Os hashes dos dados de demonstração correspondem às senhas documentadas e cada conta tem um só perfil.
         for (String login : new String[]{"ana.souza", "carlos.lima", "mariana.alves"}) {
             Usuario conta = usuarios.findComPerfisByLogin(login).orElseThrow();
             assertThat(passwordEncoder.matches("Paciente123", conta.getPassword())).as(login).isTrue();

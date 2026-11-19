@@ -13,11 +13,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.header.writers.DelegatingRequestMatcherHeaderWriter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
-import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 
 
 /**
@@ -27,7 +24,7 @@ import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
  * - MEDICO: cadastra os horários disponíveis da própria agenda;
  * - ATENDENTE: marca, cancela e reagenda consultas, confirma presença e registra falta;
  * - ADMIN, ATENDENTE e MEDICO: pacientes, consultas, a lista de médicos e a agenda;
- * - ADMIN: cadastro de médicos, exclusões, auditoria e o console H2 (a conta admin
+ * - ADMIN: cadastro de médicos, exclusões e auditoria (a conta admin
  *   também tem o perfil ATENDENTE).
  */
 @Configuration
@@ -58,8 +55,6 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/medicos/save", "/medicos/update").hasRole(Perfil.ADMIN)
                         // Exclusões também exigem ADMIN (e são POST, para passarem pela proteção CSRF).
                         .requestMatchers("/medicos/remove/**", "/pacientes/remove/**").hasRole(Perfil.ADMIN)
-                        // O console H2 também exige ADMIN.
-                        .requestMatchers("/h2-console/**").hasRole(Perfil.ADMIN)
 
                         // Horários disponíveis: só o médico cadastra, e apenas na própria agenda
                         // (o AgendaController usa o médico da conta, não o do formulário).
@@ -95,8 +90,7 @@ public class SecurityConfiguration {
                 )
                 .rememberMe(Customizer.withDefaults())
 
-                // O console H2 é uma aplicação à parte: não envia o token CSRF e abre em frames.
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
+                // CSRF: o padrão do Spring Security, sem exceções.
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.sameOrigin())
                         // Não envia o endereço completo (que pode ter ids e datas) para outros sites.
@@ -105,10 +99,8 @@ public class SecurityConfiguration {
                         .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
                                 "camera=(), microphone=(), geolocation=(), payment=()"))
                         // CSP: só scripts e estilos da própria aplicação e do CDN do Bootstrap; nada
-                        // inline. O console H2 usa scripts inline e fica de fora.
-                        .addHeaderWriter(new DelegatingRequestMatcherHeaderWriter(
-                                new NegatedRequestMatcher(PathPatternRequestMatcher.withDefaults().matcher("/h2-console/**")),
-                                new StaticHeadersWriter("Content-Security-Policy", POLITICA_DE_CONTEUDO))));
+                        // inline.
+                        .addHeaderWriter(new StaticHeadersWriter("Content-Security-Policy", POLITICA_DE_CONTEUDO)));
         // O HSTS (Strict-Transport-Security) já vem ligado e é enviado nas respostas por HTTPS.
 
         return http.build();

@@ -46,7 +46,7 @@ class Aula1ApplicationTests {
         Paciente ana = pacientes.findByUsuarioLogin("ana.souza").orElseThrow();
         Medico eduardo = medicos.findByUsuarioLogin("eduardo.melo").orElseThrow();
 
-        // Consulta do import.sql: Ana com o Dr. Eduardo. O @EntityGraph traz o caminho inteiro,
+        // Consulta dos dados de demonstração: Ana com o Dr. Eduardo. O @EntityGraph traz o caminho inteiro,
         // então os nomes podem ser lidos fora de uma transação.
         Consulta consulta = consultas.findByAgendamentoPacienteIdOrderByDataRealizacaoDesc(ana.getId()).stream()
                 .filter(c -> "Consulta de rotina.".equals(c.getObservacoes()))

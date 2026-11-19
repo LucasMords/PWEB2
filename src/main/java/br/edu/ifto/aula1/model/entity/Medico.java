@@ -51,7 +51,7 @@ public class Medico {
 
     // Conta institucional do médico, criada pelo ADMIN no cadastro. Fica sem getter/setter
     // de propósito: assim o formulário não consegue preencher nada dela.
-    // Médicos antigos (import.sql) não têm conta, por isso a coluna aceita null.
+    // A coluna aceita null: um médico pode existir sem conta de acesso.
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
     @JoinColumn(name = "usuario_id", unique = true)
     private Usuario usuario;

@@ -36,41 +36,49 @@ password and creates the `Usuario` in the same transaction, with `PACIENTE` or
 
 ## Initial users
 
-`import.sql` runs first, when Hibernate creates the schema. It inserts the four
-profiles and one account for each sample patient and doctor, already linked
-through `usuario_id`:
+The Flyway migration `V1__esquema_inicial.sql` inserts the four profiles. In
+development and in the tests, the demo migration (`db/demo`) also inserts one
+account for each sample patient and doctor, already linked through `usuario_id`:
 
 - Patients (`PACIENTE`): `ana.souza`, `carlos.lima`, `mariana.alves`, all with
   the password `Paciente123`
 - Doctors (`MEDICO`): `beatriz.rocha`, `eduardo.melo`, both with the password
   `Medico123`
 
-The `password` column in `import.sql` holds BCrypt hashes generated with the
-application's `BCryptPasswordEncoder`. To change a password there, generate a new
-hash with the same encoder; plain text in that column will not authenticate.
+The `password` column in the demo migration holds BCrypt hashes generated with
+the application's `BCryptPasswordEncoder`; plain text in that column will not
+authenticate. The `prod` profile never loads the demo data.
 
-Then `InitialUsersInitializer` creates whatever is still missing: the staff
-accounts (and the profiles, if `import.sql` stops inserting them):
+Then `InitialUsersInitializer` creates the staff accounts the first time the
+application starts on a new database, and does nothing afterwards (so a password
+changed later is not reset):
 
-- Admin: `admin` / `Admin123` (profiles `ADMIN` and `ATENDENTE`)
-- Front desk: `atendente` / `Atendente123` (profile `ATENDENTE`)
+- Admin: `admin` (profiles `ADMIN` and `ATENDENTE`), password from
+  `CLINICA_SENHA_ADMIN`
+- Front desk: `atendente` (profile `ATENDENTE`), password from
+  `CLINICA_SENHA_ATENDENTE`; an empty value means the account is not created
 
-These are development credentials only. The integration tests log in with them,
-so change the tests together. The `prod` profile (Docker image) still creates
-them: change the passwords before exposing the application to real users.
+In development the defaults are `Admin123` and `Atendente123`; the integration
+tests log in with them. The `prod` profile has no defaults: without
+`CLINICA_SENHA_ADMIN` the application does not start.
 
 ## Production profile
 
-`application-prod.properties` (active in the Docker image) turns off SQL logging,
-which could leak patient data, and the H2 console. It marks the session cookie
-`Secure` and trusts the `X-Forwarded-*` headers of the reverse proxy that
-terminates HTTPS, so redirects and HSTS use `https`. The container runs as a
-non-root user.
+`application-prod.properties` (active in the Docker image) loads only the schema
+migrations and turns off SQL logging, which could leak patient data. It marks the
+session cookie `Secure` and trusts the `X-Forwarded-*` headers of the reverse
+proxy that terminates HTTPS, so redirects and HSTS use `https`. The container
+runs as a non-root user.
 
-The current datasource is an in-memory H2 database and the schema is recreated
-on each run (`spring.jpa.hibernate.ddl-auto=create-drop`), so every account,
-including the ones created through the forms, is lost on restart, and
-remember-me cookies stop being valid.
+## Database credentials
+
+The application connects to PostgreSQL with its own role (`clinica`, owner of the
+`clinica` database), never with the `postgres` superuser. The URL, user and
+password come from the environment (`DB_URL`, `DB_USUARIO`, `DB_SENHA`); no
+password is stored in the repository. Docker Compose reads them from a `.env`
+file, which is ignored by git (`.env.exemplo` documents the variables). Database
+backups (`backups/`) contain personal and health data: they are ignored by git
+and must be stored with the same care as the database.
 
 ## Access rules
 
@@ -96,7 +104,7 @@ remember-me cookies stop being valid.
   the day schedule (`/agenda/dia`; a `MEDICO` only sees their own) and the
   appointment history (`/consultas/**`).
 - `ADMIN` only: add/edit/remove doctors, remove patients, the audit log
-  (`/auditoria`) and the H2 console.
+  (`/auditoria`).
 - A `PACIENTE` cannot open the patient, doctor, time slot, booking management or
   appointment history pages, nor book, cancel or reschedule (`403`), so one
   patient never sees or changes another patient's data.
@@ -136,8 +144,7 @@ HTTPS responses):
 - `Content-Security-Policy`: scripts, styles and fonts only from the application
   and from the Bootstrap CDN (`cdn.jsdelivr.net`), no inline script or style,
   `object-src 'none'`, `form-action 'self'`. The templates have no inline JavaScript
-  (confirmations use `data-confirmar` and `static/js/confirmar.js`). The H2 console
-  uses inline scripts and is left out of the policy.
+  (confirmations use `data-confirmar` and `static/js/confirmar.js`).
 - `Referrer-Policy: strict-origin-when-cross-origin`.
 - `Permissions-Policy` turning off camera, microphone, geolocation and payment.
 
@@ -192,5 +199,4 @@ actions (`/agendamentos/save`, `/agendamentos/cancelar/{id}`,
 `th:action`, so they carry the CSRF token like every other form. A GET to those
 URLs answers `405`.
 
-The CSRF exception is limited to the H2 console, which does not submit Spring's
-token.
+There are no CSRF exceptions.
