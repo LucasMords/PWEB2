@@ -149,8 +149,8 @@ public class AgendaController {
     @GetMapping("/lote")
     public ModelAndView lote(Authentication autenticacao, ModelMap model) {
         AgendaLoteForm form = new AgendaLoteForm();
-        form.setDataInicio(LocalDate.now());
-        form.setDataFim(LocalDate.now().plusWeeks(4));
+        form.setDataInicio(LocalDate.now(clock));
+        form.setDataFim(LocalDate.now(clock).plusWeeks(4));
         model.addAttribute("form", form);
         return formularioLote(autenticacao, model);
     }

@@ -37,6 +37,7 @@ services:
       DB_SENHA: ${DB_SENHA:?defina DB_SENHA no arquivo .env}
       CLINICA_SENHA_ADMIN: ${CLINICA_SENHA_ADMIN:?defina CLINICA_SENHA_ADMIN no arquivo .env}
       CLINICA_SENHA_ATENDENTE: ${CLINICA_SENHA_ATENDENTE:-}
+      CLINICA_FUSO: ${CLINICA_FUSO:-America/Araguaina}
     volumes:
       # Os arquivos de log sobrevivem a recriacao do container.
       - logs:/app/logs
