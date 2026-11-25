@@ -8,6 +8,7 @@ import br.edu.ifto.aula1.validation.Credenciais;
 import br.edu.ifto.aula1.validation.CredenciaisValidator;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.validation.BindingResult;
@@ -104,8 +105,9 @@ public class PacienteController {
     }
 
     @GetMapping("/consultas/{id}")
-    public ModelAndView consultas(@PathVariable("id") Long id, ModelMap model) {
+    public ModelAndView consultas(@PathVariable("id") Long id, Authentication autenticacao, ModelMap model) {
         Paciente paciente = service.buscar(id);
+        model.addAttribute("medicoDaConta", consultaService.medicoDaConta(autenticacao.getName()));
 
         model.addAttribute("titulo", "Consultas do paciente " + paciente.getNome());
         model.addAttribute("consultas", consultaService.listarPorPaciente(id));

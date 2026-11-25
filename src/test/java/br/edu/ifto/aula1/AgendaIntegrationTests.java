@@ -528,7 +528,7 @@ class AgendaIntegrationTests {
         // A consulta aparece no histórico da clínica e no da paciente, com paciente e médico.
         mvc.perform(get("/consultas/list").with(recepcao))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("/consultas/edit/" + consulta.getId() + "\"")))
+                .andExpect(content().string(not(containsString("/consultas/edit/"))))
                 .andExpect(content().string(containsString("Nº " + agendamento.getId())));
         mvc.perform(get("/usuario/consultas").with(contaDaAna))
                 .andExpect(content().string(containsString("Nº " + agendamento.getId())));
@@ -561,21 +561,52 @@ class AgendaIntegrationTests {
     }
 
     @Test
-    void observacoesDaConsultaPodemSerEditadasPelaEquipe() throws Exception {
+    void observacoesSoSaoLidasEEditadasPeloMedicoQueAtendeu() throws Exception {
         Agendamento agendamento = agendamentoDeOntem(eduardo, carlos);
         Consulta consulta = agendamentoService.confirmarPresenca(agendamento.getId());
 
-        mvc.perform(get("/consultas/edit/" + consulta.getId()).with(recepcao))
+        mvc.perform(get("/consultas/edit/" + consulta.getId()).with(contaDoEduardo))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Carlos Lima")))
                 .andExpect(content().string(containsString("Dr. Eduardo Melo")));
-        mvc.perform(post("/consultas/update").with(csrf()).with(recepcao)
+        mvc.perform(post("/consultas/update").with(csrf()).with(contaDoEduardo)
                         .param("id", consulta.getId().toString()).param("observacoes", "x".repeat(501)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("As observações devem ter no máximo 500 caracteres.")));
-        mvc.perform(post("/consultas/update").with(csrf()).with(recepcao)
+        mvc.perform(post("/consultas/update").with(csrf()).with(contaDoEduardo)
                         .param("id", consulta.getId().toString()).param("observacoes", "Paciente orientado."))
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/consultas/list"));
+
+        // Atendimento, administração, outra médica e o próprio paciente não editam.
+        for (RequestPostProcessor conta : List.of(recepcao, admin, contaDaBeatriz, contaDoCarlos)) {
+            mvc.perform(get("/consultas/edit/" + consulta.getId()).with(conta)).andExpect(status().isForbidden());
+            mvc.perform(post("/consultas/update").with(csrf()).with(conta)
+                            .param("id", consulta.getId().toString()).param("observacoes", "Outra coisa."))
+                    .andExpect(status().isForbidden());
+        }
+        // A equipe vê que a consulta aconteceu, mas não as observações, em nenhuma das listagens.
+        for (RequestPostProcessor conta : List.of(recepcao, admin, contaDaBeatriz))
+            for (String url : List.of("/consultas/list", "/pacientes/consultas/" + carlos.getId(),
+                    "/medicos/consultas/" + eduardo.getId()))
+                mvc.perform(get(url).with(conta))
+                        .andExpect(status().isOk())
+                        .andExpect(content().string(containsString("Nº " + agendamento.getId() + "<")))
+                        .andExpect(content().string(not(containsString("Paciente orientado."))));
+        // O médico que atendeu e o paciente leem.
+        for (String url : List.of("/consultas/list", "/usuario/consultas", "/pacientes/consultas/" + carlos.getId(),
+                "/medicos/consultas/" + eduardo.getId()))
+            mvc.perform(get(url).with(contaDoEduardo))
+                    .andExpect(content().string(containsString("Paciente orientado.")))
+                    .andExpect(content().string(containsString("/consultas/edit/" + consulta.getId() + "\"")));
+        mvc.perform(get("/usuario/consultas").with(contaDoCarlos))
+                .andExpect(content().string(containsString("Paciente orientado.")))
+                .andExpect(content().string(not(containsString("/consultas/edit/"))));
+        // Outra paciente não lê, e paciente nenhum abre as listagens da equipe.
+        mvc.perform(get("/usuario/consultas").with(contaDaAna))
+                .andExpect(content().string(not(containsString("Paciente orientado."))));
+        for (String url : List.of("/consultas/list", "/pacientes/consultas/" + carlos.getId(),
+                "/medicos/consultas/" + eduardo.getId()))
+            mvc.perform(get(url).with(contaDoCarlos)).andExpect(status().isForbidden());
 
         assertThat(consultas.findById(consulta.getId()).orElseThrow().getObservacoes()).isEqualTo("Paciente orientado.");
         // Não existe mais cadastro direto de consulta.

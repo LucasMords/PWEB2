@@ -56,6 +56,10 @@ public class SecurityConfiguration {
                         // Exclusões também exigem ADMIN (e são POST, para passarem pela proteção CSRF).
                         .requestMatchers("/medicos/remove/**", "/pacientes/remove/**").hasRole(Perfil.ADMIN)
 
+                        // Observações são dado de saúde: só o médico edita, e só as das próprias
+                        // consultas (o ConsultaService confere de quem é a consulta).
+                        .requestMatchers("/consultas/edit/**", "/consultas/update").hasRole(Perfil.MEDICO)
+
                         // Horários disponíveis: só o médico cadastra, e apenas na própria agenda
                         // (o AgendaController usa o médico da conta, não o do formulário).
                         .requestMatchers("/agenda/form", "/agenda/save", "/agenda/lote").hasRole(Perfil.MEDICO)

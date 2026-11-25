@@ -135,6 +135,12 @@ and must be stored with the same care as the database.
 - Passwords need 8 to 72 characters, letters and digits, and must not contain the
   username (`Credenciais`, `CredenciaisValidator`).
 
+## Appointment notes
+
+Notes (`Consulta.observacoes`) are health data: only the doctor who attended the
+patient edits them (`ConsultaService.buscarDoMedico`), and only that doctor and the
+patient read them. Other staff see that the appointment happened, without the notes.
+
 ## Security headers
 
 `SecurityConfiguration` sends, besides Spring Security's defaults

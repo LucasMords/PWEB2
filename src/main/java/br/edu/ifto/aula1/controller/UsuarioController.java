@@ -103,6 +103,9 @@ public class UsuarioController {
                         .map(medico -> consultaService.listarPorMedico(medico.getId())))
                 .orElse(List.of());
 
+        // São todas da própria pessoa: do paciente atendido ou do médico que atendeu.
+        model.addAttribute("consultasProprias", true);
+        model.addAttribute("medicoDaConta", consultaService.medicoDaConta(login));
         model.addAttribute("titulo", "Minhas consultas");
         model.addAttribute("consultas", consultas);
         return new ModelAndView("consulta/lista", model);

@@ -4,6 +4,7 @@ import br.edu.ifto.aula1.dto.ConsultaForm;
 import br.edu.ifto.aula1.model.entity.Consulta;
 import br.edu.ifto.aula1.service.ConsultaService;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.validation.BindingResult;
@@ -18,7 +19,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Histórico das consultas realizadas. Não há cadastro aqui: a consulta é criada quando a
  * clínica confirma a presença do paciente (AgendamentoController.confirmar). Depois disso
- * só as observações podem ser editadas.
+ * só as observações podem ser editadas, e apenas pelo médico que atendeu: são dado de
+ * saúde, que os demais perfis da equipe nem leem (só veem que a consulta aconteceu).
  */
 @Controller
 @RequestMapping("consultas")
@@ -31,15 +33,16 @@ public class ConsultaController {
     }
 
     @GetMapping("/list")
-    public ModelAndView listar(ModelMap model) {
+    public ModelAndView listar(Authentication autenticacao, ModelMap model) {
+        model.addAttribute("medicoDaConta", service.medicoDaConta(autenticacao.getName()));
         model.addAttribute("titulo", "Histórico de consultas");
         model.addAttribute("consultas", service.listar());
         return new ModelAndView("consulta/lista", model);
     }
 
     @GetMapping("/edit/{id}")
-    public ModelAndView edit(@PathVariable("id") Long id, ModelMap model) {
-        Consulta consulta = service.buscar(id);
+    public ModelAndView edit(@PathVariable("id") Long id, Authentication autenticacao, ModelMap model) {
+        Consulta consulta = service.buscarDoMedico(id, autenticacao.getName());
 
         ConsultaForm form = new ConsultaForm();
         form.setId(consulta.getId());
@@ -52,16 +55,16 @@ public class ConsultaController {
 
     @PostMapping("/update")
     public ModelAndView update(@Valid @ModelAttribute("form") ConsultaForm form, BindingResult result,
-                               ModelMap model, RedirectAttributes attributes) {
-        // Garante que a consulta editada existe (senão 404) antes de qualquer validação.
-        Consulta consulta = service.buscar(form.getId());
+                               Authentication autenticacao, ModelMap model, RedirectAttributes attributes) {
+        // Garante que a consulta existe (senão 404) e é deste médico (senão 403) antes de qualquer validação.
+        Consulta consulta = service.buscarDoMedico(form.getId(), autenticacao.getName());
 
         if (result.hasErrors()) {
             model.addAttribute("consulta", consulta);
             return new ModelAndView("consulta/formulario", model);
         }
 
-        service.atualizarObservacoes(form.getId(), form.getObservacoes());
+        service.atualizarObservacoes(form.getId(), form.getObservacoes(), autenticacao.getName());
         attributes.addFlashAttribute("mensagem", "Observações atualizadas com sucesso.");
         return new ModelAndView("redirect:/consultas/list");
     }
