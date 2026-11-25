@@ -6,7 +6,10 @@ import br.edu.ifto.aula1.service.AuditoriaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -31,27 +34,49 @@ public class TentativasLoginService {
     private final UsuarioRepository usuarios;
     private final AuditoriaService auditoria;
     private final Clock clock;
+    private final TransactionTemplate transacao;
 
-    public TentativasLoginService(UsuarioRepository usuarios, AuditoriaService auditoria, Clock clock) {
+    public TentativasLoginService(UsuarioRepository usuarios, AuditoriaService auditoria, Clock clock,
+                                  PlatformTransactionManager transacoes) {
+        this.transacao = new TransactionTemplate(transacoes);
         this.usuarios = usuarios;
         this.auditoria = auditoria;
         this.clock = clock;
     }
 
-    @Transactional
-    public void registrarFalha(String loginDigitado) {
-        String login = limitar(loginDigitado);
-        LocalDateTime agora = LocalDateTime.now(clock);
+    /** Uma senha errada já contada, a ser auditada; bloqueadoAte só vem quando ela bloqueou a conta. */
+    public record Falha(String login, boolean contaExiste, LocalDateTime bloqueadoAte) {
+    }
 
-        usuarios.buscarComBloqueio(login).ifPresentOrElse(usuario -> {
-            boolean bloqueou = usuario.registrarFalha(agora, LIMITE_TENTATIVAS, DURACAO_BLOQUEIO);
-            auditoria.registrarSeparado(login, AcaoAuditoria.LOGIN_FALHOU, null);
-            if (bloqueou) {
-                log.warn("Conta {} bloqueada até {} por excesso de tentativas", login, usuario.getBloqueadoAte());
-                auditoria.registrarSeparado(login, AcaoAuditoria.CONTA_BLOQUEADA,
-                        "Bloqueada até " + usuario.getBloqueadoAte().withNano(0));
-            }
-        }, () -> auditoria.registrarSeparado(login, AcaoAuditoria.LOGIN_FALHOU, "Usuário inexistente"));
+    /**
+     * Conta a falha e depois a audita. Fora de qualquer transação (NEVER): a auditoria usa outra
+     * conexão, e pedi-la com a conta ainda bloqueada esgotaria o pool quando há muitas falhas juntas.
+     */
+    @Transactional(propagation = Propagation.NEVER)
+    public void registrarFalha(String loginDigitado) {
+        auditarFalha(transacao.execute(status -> contarFalha(loginDigitado)));
+    }
+
+    /** Só a contagem, na transação de quem chama, que deve chamar {@link #auditarFalha} depois dela. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Falha contarFalha(String loginDigitado) {
+        String login = limitar(loginDigitado);
+        return usuarios.buscarComBloqueio(login).map(usuario -> {
+            boolean bloqueou = usuario.registrarFalha(LocalDateTime.now(clock), LIMITE_TENTATIVAS, DURACAO_BLOQUEIO);
+            return new Falha(login, true, bloqueou ? usuario.getBloqueadoAte() : null);
+        }).orElseGet(() -> new Falha(login, false, null));
+    }
+
+    /** Auditoria de uma falha já contada, sem transação aberta. */
+    @Transactional(propagation = Propagation.NEVER)
+    public void auditarFalha(Falha falha) {
+        auditoria.registrarSeparado(falha.login(), AcaoAuditoria.LOGIN_FALHOU,
+                falha.contaExiste() ? null : "Usuário inexistente");
+        if (falha.bloqueadoAte() != null) {
+            log.warn("Conta {} bloqueada até {} por excesso de tentativas", falha.login(), falha.bloqueadoAte());
+            auditoria.registrarSeparado(falha.login(), AcaoAuditoria.CONTA_BLOQUEADA,
+                    "Bloqueada até " + falha.bloqueadoAte().withNano(0));
+        }
     }
 
     @Transactional(readOnly = true)

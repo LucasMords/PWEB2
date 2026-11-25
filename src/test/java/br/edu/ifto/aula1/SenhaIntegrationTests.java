@@ -6,33 +6,54 @@ import br.edu.ifto.aula1.model.entity.RegistroAuditoria;
 import br.edu.ifto.aula1.model.entity.Usuario;
 import br.edu.ifto.aula1.model.repository.RegistroAuditoriaRepository;
 import br.edu.ifto.aula1.model.repository.UsuarioRepository;
+import br.edu.ifto.aula1.security.SessoesService;
 import br.edu.ifto.aula1.security.TentativasLoginService;
+import br.edu.ifto.aula1.security.UsuarioDetailsService;
 import br.edu.ifto.aula1.service.UsuarioService;
 import br.edu.ifto.aula1.validation.Credenciais;
+import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.servlet.http.Cookie;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.event.EventListener;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.RememberMeServices;
+import org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntFunction;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,6 +75,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class SenhaIntegrationTests {
 
+    /** Roda uma vez, entre a conferência da senha e o registro da sessão. */
+    private static final AtomicReference<Runnable> DEPOIS_DE_AUTENTICAR = new AtomicReference<>();
+
+    @TestConfiguration
+    static class PausaNoLogin {
+        @EventListener
+        void autenticou(AuthenticationSuccessEvent evento) {
+            Runnable acao = DEPOIS_DE_AUTENTICAR.getAndSet(null);
+            if (acao != null)
+                acao.run();
+        }
+    }
+
     private static final AtomicInteger SEQUENCIA = new AtomicInteger();
     private static final String ATUAL = "Primeira-1234";
     private static final String NOVA = "Segunda-5678";
@@ -63,6 +97,11 @@ class SenhaIntegrationTests {
     @Autowired private UsuarioRepository usuarios;
     @Autowired private RegistroAuditoriaRepository auditoria;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private TentativasLoginService tentativas;
+    @Autowired private SessoesService sessoes;
+    @Autowired private UsuarioDetailsService contas;
+    @Autowired private SecurityFilterChain cadeia;
+    @Autowired private DataSource dataSource;
     @Autowired private TransactionTemplate transacao;
     @Autowired private EntityManagerFactory fabrica;
 
@@ -72,10 +111,8 @@ class SenhaIntegrationTests {
     @BeforeEach
     void novaConta() {
         login = "conta.senha" + SEQUENCIA.incrementAndGet();
-        Credenciais credenciais = new Credenciais();
-        credenciais.setLogin(login);
-        credenciais.setSenha(ATUAL);
-        service.criar(credenciais, Perfil.PACIENTE);
+        criarConta(login);
+        DEPOIS_DE_AUTENTICAR.set(null);
     }
 
     @Test
@@ -250,12 +287,13 @@ class SenhaIntegrationTests {
     @Test
     void redefinicaoSimultaneaATrocaContinuaExigindoNovaTroca() throws Exception {
         Long id = conta().getId();
-        String provisoria = service.redefinirSenha(id, "admin").senha();
+        service.redefinirSenha(id, "admin");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         String outra;
         try {
             Future<UsuarioService.SenhaProvisoria> redefinicao = transacao.execute(status -> {
-                assertThat(service.trocarSenha(login, provisoria, NOVA)).isEqualTo(UsuarioService.ResultadoTroca.TROCADA);
+                // O mesmo que a troca faz com a conta bloqueada, sem confirmar ainda.
+                usuarios.buscarComBloqueio(login).orElseThrow().trocarSenha(passwordEncoder.encode(NOVA));
                 var futura = executor.submit(() -> service.redefinirSenha(id, "admin"));
                 assertEsperando(futura);
                 return futura;
@@ -323,6 +361,138 @@ class SenhaIntegrationTests {
 
     private boolean senhaConfere(String login, String senha) {
         return passwordEncoder.matches(senha, usuarios.findByLogin(login).orElseThrow().getPassword());
+    }
+
+    @Test
+    @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void maisSenhasErradasSimultaneasDoQueConexoesNaoParamOSistema() throws Exception {
+        int requisicoes = conexoes() * 3;
+        String outra = login + ".outra";
+        criarConta(outra);
+
+        List<UsuarioService.ResultadoTroca> resultados = aoMesmoTempo(requisicoes + 1, i -> i < requisicoes
+                ? service.trocarSenha(login, "errada-" + i, NOVA)
+                : service.trocarSenha(outra, ATUAL, NOVA));
+
+        // Outra conta é atendida no meio delas.
+        assertThat(resultados.get(requisicoes)).isEqualTo(UsuarioService.ResultadoTroca.TROCADA);
+        List<UsuarioService.ResultadoTroca> daConta = resultados.subList(0, requisicoes);
+        assertThat(daConta).filteredOn(r -> r == UsuarioService.ResultadoTroca.SENHA_INCORRETA)
+                .hasSize(TentativasLoginService.LIMITE_TENTATIVAS);
+        assertThat(daConta).filteredOn(r -> r == UsuarioService.ResultadoTroca.CONTA_BLOQUEADA)
+                .hasSize(requisicoes - TentativasLoginService.LIMITE_TENTATIVAS);
+        assertThat(auditoria.findByUsuarioAndAcaoOrderByIdDesc(login, AcaoAuditoria.LOGIN_FALHOU))
+                .hasSize(TentativasLoginService.LIMITE_TENTATIVAS);
+        assertThat(auditoria.findByUsuarioAndAcaoOrderByIdDesc(login, AcaoAuditoria.CONTA_BLOQUEADA)).hasSize(1);
+    }
+
+    @Test
+    @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void maisFalhasDeLoginSimultaneasDoQueConexoesSaoTodasContadas() throws Exception {
+        int requisicoes = conexoes() * 3;
+
+        aoMesmoTempo(requisicoes, i -> {
+            tentativas.registrarFalha(login);
+            return null;
+        });
+
+        assertThat(conta().getTentativasFalhas()).isEqualTo(requisicoes % TentativasLoginService.LIMITE_TENTATIVAS);
+        assertThat(conta().getBloqueadoAte()).isNotNull();
+        assertThat(auditoria.findByUsuarioAndAcaoOrderByIdDesc(login, AcaoAuditoria.LOGIN_FALHOU)).hasSize(requisicoes);
+    }
+
+    @Test
+    void loginQueConferiuASenhaAntesDaTrocaNaoAbreSessaoDepoisDela() throws Exception {
+        Long id = conta().getId();
+        DEPOIS_DE_AUTENTICAR.set(() -> {
+            service.redefinirSenha(id, "admin");
+            sessoes.encerrar(login, null);
+        });
+
+        MvcResult entrada = mvc.perform(post("/login").with(csrf())
+                        .param("username", login).param("password", ATUAL).param("remember-me", "on"))
+                .andExpect(redirectedUrl("/login?error")).andReturn();
+
+        assertThat(DEPOIS_DE_AUTENTICAR.get()).isNull();
+        Cookie lembrar = entrada.getResponse().getCookie("remember-me");
+        assertThat(lembrar == null || lembrar.getMaxAge() == 0).isTrue();
+        semSessaoValida(entrada);
+    }
+
+    @Test
+    void rememberMeConferidoAntesDaTrocaNaoAbreSessaoDepoisDela() throws Exception {
+        Long id = conta().getId();
+        Cookie lembrar = entrarComLembrar().getResponse().getCookie("remember-me");
+        DEPOIS_DE_AUTENTICAR.set(() -> {
+            service.redefinirSenha(id, "admin");
+            sessoes.encerrar(login, null);
+        });
+
+        MvcResult resposta = mvc.perform(get("/usuario/dados").cookie(lembrar))
+                .andExpect(status().isUnauthorized()).andReturn();
+
+        assertThat(DEPOIS_DE_AUTENTICAR.get()).isNull();
+        semSessaoValida(resposta);
+    }
+
+    @Test
+    void cookieEmitidoDepoisDaTrocaPorUmLoginAnteriorNaoVale() throws Exception {
+        UserDetails conferida = contas.loadUserByUsername(login);
+        ((User) conferida).eraseCredentials();
+        assertThat(service.trocarSenha(login, ATUAL, NOVA)).isEqualTo(UsuarioService.ResultadoTroca.TROCADA);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setParameter("remember-me", "on");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        lembrarDeMim().loginSuccess(request, response,
+                UsernamePasswordAuthenticationToken.authenticated(conferida, null, conferida.getAuthorities()));
+
+        assertThat(response.getCookie("remember-me")).isNotNull();
+        mvc.perform(get("/usuario/dados").cookie(response.getCookie("remember-me"))).andExpect(status().isUnauthorized());
+    }
+
+    /** A sessão, se sobrou alguma, não está autenticada nem registrada como válida. */
+    private void semSessaoValida(MvcResult resultado) throws Exception {
+        MockHttpSession sessao = (MockHttpSession) resultado.getRequest().getSession(false);
+        if (sessao != null && !sessao.isInvalid())
+            mvc.perform(get("/usuario/dados").session(sessao)).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/usuario/dados").with(httpBasic(login, ATUAL))).andExpect(status().isUnauthorized());
+    }
+
+    private RememberMeServices lembrarDeMim() {
+        return cadeia.getFilters().stream().filter(f -> f instanceof RememberMeAuthenticationFilter)
+                .map(f -> ((RememberMeAuthenticationFilter) f).getRememberMeServices()).findFirst().orElseThrow();
+    }
+
+    private int conexoes() throws Exception {
+        return dataSource.unwrap(HikariDataSource.class).getMaximumPoolSize();
+    }
+
+    private static <T> List<T> aoMesmoTempo(int quantas, IntFunction<T> acao) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(quantas);
+        try {
+            CountDownLatch largada = new CountDownLatch(1);
+            List<Future<T>> futuras = IntStream.range(0, quantas).mapToObj(i -> executor.submit(() -> {
+                largada.await();
+                return acao.apply(i);
+            })).toList();
+            largada.countDown();
+            // Menos que os 30 s de espera do pool: um esgotamento aparece como falha.
+            long fim = System.nanoTime() + TimeUnit.SECONDS.toNanos(25);
+            List<T> resultados = new ArrayList<>();
+            for (Future<T> futura : futuras)
+                resultados.add(futura.get(Math.max(1, fim - System.nanoTime()), TimeUnit.NANOSECONDS));
+            return resultados;
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private void criarConta(String novoLogin) {
+        Credenciais credenciais = new Credenciais();
+        credenciais.setLogin(novoLogin);
+        credenciais.setSenha(ATUAL);
+        service.criar(credenciais, Perfil.PACIENTE);
     }
 
     private String redefinir() throws Exception {

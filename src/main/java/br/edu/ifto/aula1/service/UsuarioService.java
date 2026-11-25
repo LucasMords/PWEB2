@@ -12,12 +12,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
@@ -28,6 +32,7 @@ public class UsuarioService {
     private final PasswordEncoder passwordEncoder;
     private final AuditoriaService auditoria;
     private final TentativasLoginService tentativas;
+    private final TransactionTemplate transacao;
 
     // Sem caracteres que se confundem ao ditar ou copiar (0/O, 1/l/I).
     private static final String LETRAS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
@@ -36,7 +41,9 @@ public class UsuarioService {
     private static final SecureRandom SORTEIO = new SecureRandom();
 
     public UsuarioService(UsuarioRepository usuarios, PerfilRepository perfis, PasswordEncoder passwordEncoder,
-                          AuditoriaService auditoria, TentativasLoginService tentativas) {
+                          AuditoriaService auditoria, TentativasLoginService tentativas,
+                          PlatformTransactionManager transacoes) {
+        this.transacao = new TransactionTemplate(transacoes);
         this.tentativas = tentativas;
         this.auditoria = auditoria;
         this.usuarios = usuarios;
@@ -72,26 +79,48 @@ public class UsuarioService {
         return usuarios.existsByLoginAndTrocarSenhaTrue(login);
     }
 
+    private record Tentativa(ResultadoTroca resultado, TentativasLoginService.Falha falha) {
+    }
+
     /**
-     * Troca da própria senha. A atual é conferida com a conta já bloqueada (pessimista), para
-     * não gravar por cima de uma redefinição simultânea. Uma sessão deixada aberta não pode
-     * servir para descobrir a senha por tentativa e erro: as falhas contam para o mesmo
-     * bloqueio do login. O resultado é devolvido, e não lançado, porque uma exceção desfaria
-     * essa contagem.
+     * Troca da própria senha. Uma sessão deixada aberta não pode servir para descobrir a senha
+     * por tentativa e erro: as falhas contam para o mesmo bloqueio do login.
+     *
+     * O BCrypt, lento, roda antes da transação, para que muitas trocas da mesma conta não
+     * prendam as conexões dos outros. A decisão é tomada com a conta bloqueada (pessimista): se
+     * a senha mudou nesse meio tempo, é conferida de novo, para não gravar por cima de uma
+     * redefinição simultânea. A falha é contada nessa transação e auditada depois dela (por isso
+     * NEVER), quando a conexão já foi devolvida.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.NEVER)
     public ResultadoTroca trocarSenha(String login, String senhaAtual, String novaSenha) {
-        Usuario usuario = usuarios.buscarComBloqueio(login)
-                .orElseThrow(() -> new RegistroNaoEncontradoException("Usuário não encontrado."));
-        if (tentativas.bloqueada(login))
+        Optional<String> lido = transacao.execute(status -> tentativas.bloqueada(login)
+                ? Optional.empty() : Optional.of(buscada(usuarios.findByLogin(login)).getPassword()));
+        if (lido.isEmpty())
             return ResultadoTroca.CONTA_BLOQUEADA;
-        if (!passwordEncoder.matches(senhaAtual, usuario.getPassword())) {
-            tentativas.registrarFalha(login);
-            return ResultadoTroca.SENHA_INCORRETA;
-        }
-        usuario.trocarSenha(passwordEncoder.encode(novaSenha));
-        auditoria.registrar(AcaoAuditoria.SENHA_ALTERADA, "Usuario", usuario.getId(), null);
-        return ResultadoTroca.TROCADA;
+        String hashLido = lido.get();
+        boolean confere = passwordEncoder.matches(senhaAtual, hashLido);
+        String novoHash = confere ? passwordEncoder.encode(novaSenha) : null;
+
+        Tentativa tentativa = transacao.execute(status -> {
+            Usuario usuario = buscada(usuarios.buscarComBloqueio(login));
+            if (tentativas.bloqueada(login))
+                return new Tentativa(ResultadoTroca.CONTA_BLOQUEADA, null);
+            boolean mesma = usuario.getPassword().equals(hashLido);
+            if (!(mesma ? confere : passwordEncoder.matches(senhaAtual, usuario.getPassword())))
+                return new Tentativa(ResultadoTroca.SENHA_INCORRETA, tentativas.contarFalha(login));
+
+            usuario.trocarSenha(novoHash != null ? novoHash : passwordEncoder.encode(novaSenha));
+            auditoria.registrar(AcaoAuditoria.SENHA_ALTERADA, "Usuario", usuario.getId(), null);
+            return new Tentativa(ResultadoTroca.TROCADA, null);
+        });
+        if (tentativa.falha() != null)
+            tentativas.auditarFalha(tentativa.falha());
+        return tentativa.resultado();
+    }
+
+    private static Usuario buscada(Optional<Usuario> conta) {
+        return conta.orElseThrow(() -> new RegistroNaoEncontradoException("Usuário não encontrado."));
     }
 
     /**

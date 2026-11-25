@@ -8,12 +8,14 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationEventPublisher;
 import org.springframework.security.authentication.DefaultAuthenticationEventPublisher;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.web.authentication.session.RegisterSessionAuthenticationStrategy;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -35,7 +37,8 @@ import org.springframework.security.web.header.writers.StaticHeadersWriter;
 public class SecurityConfiguration {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SessionRegistry sessoes) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SessionRegistry sessoes,
+                                                   UsuarioDetailsService contas) throws Exception {
         http
                 // As regras são avaliadas na ordem em que aparecem; anyRequest() fica por último.
                 .authorizeHttpRequests(auth -> auth
@@ -97,9 +100,18 @@ public class SecurityConfiguration {
                         .logoutSuccessUrl("/login?logout")
                         .permitAll()
                 )
-                .rememberMe(Customizer.withDefaults())
+                .rememberMe(lembrar -> lembrar.rememberMeServices(new LembrarDeMim(contas)))
                 // Sem limite de sessões por conta (-1); o registro serve para encerrá-las na troca de senha.
-                .sessionManagement(sessao -> sessao.maximumSessions(-1)
+                .sessionManagement(sessao -> sessao
+                        // Depois de registrar a sessão, confere se a senha não mudou durante o login.
+                        .withObjectPostProcessor(new ObjectPostProcessor<RegisterSessionAuthenticationStrategy>() {
+                            @Override
+                            @SuppressWarnings("unchecked")
+                            public <O extends RegisterSessionAuthenticationStrategy> O postProcess(O padrao) {
+                                return (O) new RegistroDeSessao(sessoes, contas);
+                            }
+                        })
+                        .maximumSessions(-1)
                         .sessionRegistry(sessoes).expiredUrl("/login?expirada"))
 
                 // CSRF: o padrão do Spring Security, sem exceções.
