@@ -5,6 +5,8 @@ public enum AcaoAuditoria {
     LOGIN("Entrou no sistema"),
     LOGIN_FALHOU("Senha incorreta"),
     CONTA_BLOQUEADA("Conta bloqueada por tentativas"),
+    SENHA_ALTERADA("Trocou a própria senha"),
+    SENHA_REDEFINIDA("Redefiniu a senha de uma conta"),
 
     HORARIO_CADASTRADO("Cadastrou horário"),
     HORARIOS_GERADOS("Gerou horários em lote"),

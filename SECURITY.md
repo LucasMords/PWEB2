@@ -89,7 +89,7 @@ and must be stored with the same care as the database.
   details (database, disk) are shown to `ADMIN` only. No other Actuator endpoint
   is exposed over HTTP, and `/actuator/**` requires `ADMIN` in case one ever is.
 - Any authenticated user: `/` and `/usuario/**` (own data, and read-only lists of
-  own bookings and own appointments).
+  own bookings and own appointments, and changing the own password).
 - `MEDICO` only: registering time slots (`/agenda/form`, `POST /agenda/save`, and
   in batch: `/agenda/lote`). Neither `ADMIN` nor `ATENDENTE` can.
 - `ATENDENTE` only: booking a slot for a patient
@@ -104,7 +104,7 @@ and must be stored with the same care as the database.
   the day schedule (`/agenda/dia`; a `MEDICO` only sees their own) and the
   appointment history (`/consultas/**`).
 - `ADMIN` only: add/edit/remove doctors, remove patients, the audit log
-  (`/auditoria`).
+  (`/auditoria`) and the accounts page (`/contas/**`).
 - A `PACIENTE` cannot open the patient, doctor, time slot, booking management or
   appointment history pages, nor book, cancel or reschedule (`403`), so one
   patient never sees or changes another patient's data.
@@ -125,8 +125,11 @@ and must be stored with the same care as the database.
   account is locked for 15 minutes (`DURACAO_BLOQUEIO`). While locked, not even the
   right password works: Spring Security checks the lock before the password
   (`UsuarioDetailsService` sets `accountLocked`). The lock ends by itself; a
-  successful login resets the counter. Failures are counted under a pessimistic
-  lock on the user row, so concurrent attempts are not lost.
+  successful login or password change resets the counter (a remember-me login does
+  not: it checks no password). Failures are counted under a pessimistic
+  lock on the user row, so concurrent attempts are not lost; they
+  are audited after that transaction ends, so a request never waits for a second
+  connection while holding one.
 - The counting is driven by Spring Security's authentication events
   (`EventosDeAutenticacao`, published by the `DefaultAuthenticationEventPublisher`
   bean in `SecurityConfiguration`), for both form login and HTTP Basic.
@@ -134,6 +137,23 @@ and must be stored with the same care as the database.
   a locked account, so it does not reveal which accounts exist.
 - Passwords need 8 to 72 characters, letters and digits, and must not contain the
   username (`Credenciais`, `CredenciaisValidator`).
+
+## Changing and resetting passwords
+
+- `/usuario/senha`: anyone changes their own password, confirming the current one.
+  Wrong current passwords count towards the account lock. The current password is
+  checked under a pessimistic lock on the user row, in the same transaction as the
+  change (BCrypt runs before it, and again only if the password changed meanwhile),
+  and the reset takes the same lock: one never overwrites the other.
+- `/contas/**` (`ADMIN` only): resets someone else's password to a random temporary
+  one, shown once. Until it is replaced, `TrocaSenhaObrigatoria` redirects the
+  application pages to `/usuario/senha` (Actuator is not covered: an `ADMIN` still
+  sees the health details). Admins cannot reset their own account this way.
+- Both end the other open sessions of the account (`SessoesService`), invalidate
+  remember-me cookies and are audited (never the password). A login in progress
+  re-reads the password after registering its session (`RegistroDeSessao`) and fails
+  if it changed; the remember-me cookie is only signed with the password that was
+  checked (`LembrarDeMim`).
 
 ## Appointment notes
 
@@ -157,7 +177,8 @@ HTTPS responses):
 ## Audit log
 
 `RegistroAuditoria` (table `auditoria`) records who did what, when and on which
-record: logins through the form, wrong passwords, account locks, slot
+record: logins through the form, wrong passwords, account locks, password
+changes and resets, slot
 registration, booking, cancelling, rescheduling, attendance, no-shows, changes to
 appointment notes, patient and doctor registration/edits/removals and LGPD data
 exports. `AuditoriaService.registrar` runs inside the caller's transaction

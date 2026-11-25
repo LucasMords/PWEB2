@@ -11,14 +11,19 @@ import jakarta.validation.constraints.Size;
  */
 public class Credenciais {
 
+    // Regras da senha, usadas também na troca (TrocaSenhaForm).
+    public static final String SENHA_TAMANHO = "A senha deve ter de {min} a {max} caracteres.";
+    public static final String SENHA_REGEX = "(?=.*\\p{L})(?=.*\\d).*";
+    public static final String SENHA_LETRAS_E_NUMEROS = "A senha deve ter letras e números.";
+
     @NotBlank(message = "Informe o usuário.")
     @Pattern(regexp = "[a-z0-9._-]{3,80}",
             message = "Use de 3 a 80 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.")
     private String login;
 
     @NotBlank(message = "Informe a senha.")
-    @Size(min = 8, max = 72, message = "A senha deve ter de {min} a {max} caracteres.")
-    @Pattern(regexp = "(?=.*\\p{L})(?=.*\\d).*", message = "A senha deve ter letras e números.")
+    @Size(min = 8, max = 72, message = SENHA_TAMANHO)
+    @Pattern(regexp = SENHA_REGEX, message = SENHA_LETRAS_E_NUMEROS)
     private String senha;
 
     public String getLogin() {
