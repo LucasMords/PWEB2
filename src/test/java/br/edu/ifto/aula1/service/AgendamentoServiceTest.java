@@ -17,12 +17,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -436,6 +438,56 @@ class AgendamentoServiceTest {
         assertThatThrownBy(() -> service.confirmarPresenca(null)).isInstanceOf(RegistroNaoEncontradoException.class);
     }
 
+    // ---------- Conflito de horário do paciente ----------
+
+    @Test
+    void naoAgendaSeOPacienteTemConsultaSobrepostaMesmoComOutroMedico() {
+        // O horário de teste é das 09:00 às 09:30; este, de outro médico, vai das 08:45 às 09:15.
+        pacienteOcupadoEm(HORARIO_CONSULTA.minusMinutes(15));
+
+        assertThatThrownBy(() -> service.agendar(AGENDA_ID, PACIENTE_ID))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage(AgendamentoService.PACIENTE_OCUPADO);
+        assertThat(agenda.getStatus()).isEqualTo(StatusAgenda.DISPONIVEL);
+        verify(pacienteService).bloquear(PACIENTE_ID);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void agendaConsultaEncostadaEmOutraDoPaciente() {
+        pacienteOcupadoEm(HORARIO_CONSULTA.minusMinutes(30));
+
+        assertThat(service.agendar(AGENDA_ID, PACIENTE_ID).getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+    }
+
+    @Test
+    void reagendamentoParaCimaDeOutraConsultaDoPacienteNaoMudaNada() {
+        Agendamento atual = agendamentoExistente();
+        Agenda nova = novoHorarioDoMesmoMedico(LocalDateTime.of(2030, 1, 13, 14, 0));
+        pacienteOcupadoEm(LocalDateTime.of(2030, 1, 13, 14, 15));
+
+        assertThatThrownBy(() -> service.reagendar(AGENDAMENTO_ID, 30L, RECEPCAO))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage(AgendamentoService.PACIENTE_OCUPADO);
+        assertThat(atual.getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+        assertThat(agenda.getStatus()).isEqualTo(StatusAgenda.AGENDADO);
+        assertThat(nova.getStatus()).isEqualTo(StatusAgenda.DISPONIVEL);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void oAgendamentoQueEstaSendoReagendadoNaoContaComoConflito() {
+        Agendamento atual = agendamentoExistente();
+        ReflectionTestUtils.setField(atual, "id", AGENDAMENTO_ID);
+        // Novo horário 15 minutos depois: sobrepõe só o que será liberado.
+        Agenda nova = novoHorarioDoMesmoMedico(HORARIO_CONSULTA.plusMinutes(15));
+        when(repository.buscarAtivosDoPacienteNoDia(PACIENTE_ID, nova.getData(), StatusAgendamento.CANCELADO))
+                .thenReturn(List.of(atual));
+
+        assertThat(service.reagendar(AGENDAMENTO_ID, 30L, RECEPCAO).getAgenda()).isSameAs(nova);
+        assertThat(atual.getStatus()).isEqualTo(StatusAgendamento.CANCELADO);
+    }
+
     // ---------- Apoio ----------
 
     /** Recria o serviço com o relógio parado no instante informado (os mocks continuam os mesmos). */
@@ -449,6 +501,14 @@ class AgendamentoServiceTest {
         Agenda nova = new Agenda(agenda.getMedico(), dataHora.toLocalDate(), dataHora.toLocalTime());
         when(agendaRepository.buscarComBloqueio(30L)).thenReturn(Optional.of(nova));
         return nova;
+    }
+
+    /** O paciente já tem um agendamento ativo, com outro médico, neste instante. */
+    private void pacienteOcupadoEm(LocalDateTime dataHora) {
+        Agendamento outro = new Agendamento(horario(dataHora), paciente, AGORA);
+        ReflectionTestUtils.setField(outro, "id", 99L);
+        when(repository.buscarAtivosDoPacienteNoDia(PACIENTE_ID, dataHora.toLocalDate(), StatusAgendamento.CANCELADO))
+                .thenReturn(List.of(outro));
     }
 
     private static Agenda horario(LocalDateTime dataHora) {

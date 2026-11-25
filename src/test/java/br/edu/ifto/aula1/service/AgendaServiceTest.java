@@ -37,6 +37,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -129,6 +130,67 @@ class AgendaServiceTest {
         assertThatThrownBy(() -> service.cadastrar(form(MEDICO_ID, AMANHA, null)))
                 .isInstanceOf(RegraNegocioException.class).hasMessage("Informe o horário.");
         verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cadastraComADuracaoInformadaOuComAPadrao() {
+        medicoExistente();
+        when(repository.saveAndFlush(any(Agenda.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        assertThat(service.cadastrar(form(MEDICO_ID, AMANHA, NOVE_HORAS)).getDuracaoMinutos()).isEqualTo(30);
+        for (int limite : new int[]{10, 240})
+            assertThat(service.cadastrar(form(MEDICO_ID, AMANHA, NOVE_HORAS, limite)).getDuracaoMinutos()).isEqualTo(limite);
+    }
+
+    @Test
+    void rejeitaDuracaoForaDosLimitesOuEmBranco() {
+        when(medicoService.existe(MEDICO_ID)).thenReturn(true);
+
+        for (Integer duracao : new Integer[]{null, 9, 241})
+            assertThatThrownBy(() -> service.cadastrar(form(MEDICO_ID, AMANHA, NOVE_HORAS, duracao)))
+                    .isInstanceOf(RegraNegocioException.class)
+                    .hasMessage(AgendaService.DURACAO_INVALIDA)
+                    .extracting(e -> ((RegraNegocioException) e).getCampo()).isEqualTo("duracaoMinutos");
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void consultaTerminaNoMaximoAMeiaNoite() {
+        medicoExistente();
+        when(repository.saveAndFlush(any(Agenda.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.cadastrar(form(MEDICO_ID, AMANHA, LocalTime.of(23, 30), 30));
+        assertThatThrownBy(() -> service.cadastrar(form(MEDICO_ID, AMANHA, LocalTime.of(23, 30), 31)))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage("A consulta deve terminar até a meia-noite.");
+    }
+
+    @Test
+    void rejeitaSobreposicaoParcialContidaOuQueContemOutroHorario() {
+        Medico medico = medicoExistente();
+        // Já cadastrado: 09:00 às 10:00.
+        when(repository.findByMedicoIdAndDataBetween(MEDICO_ID, AMANHA, AMANHA))
+                .thenReturn(List.of(new Agenda(medico, AMANHA, NOVE_HORAS, 60)));
+
+        assertSobreposto("08:45", 30);  // invade o começo
+        assertSobreposto("09:45", 30);  // começa antes do fim
+        assertSobreposto("09:15", 30);  // contido
+        assertSobreposto("08:30", 120); // contém
+        verify(repository, never()).saveAndFlush(any());
+        // A agenda do médico é bloqueada antes da conferência.
+        verify(medicoService, times(4)).bloquear(MEDICO_ID);
+    }
+
+    @Test
+    void horariosEncostadosNaoSeSobrepoem() {
+        Medico medico = medicoExistente();
+        when(repository.findByMedicoIdAndDataBetween(MEDICO_ID, AMANHA, AMANHA))
+                .thenReturn(List.of(new Agenda(medico, AMANHA, NOVE_HORAS, 60)));
+        when(repository.saveAndFlush(any(Agenda.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.cadastrar(form(MEDICO_ID, AMANHA, LocalTime.of(8, 30), 30));
+        service.cadastrar(form(MEDICO_ID, AMANHA, LocalTime.of(10, 0), 30));
+        verify(repository, times(2)).saveAndFlush(any());
     }
 
     // ---------- Consulta de horários ----------
@@ -258,6 +320,24 @@ class AgendaServiceTest {
                 .hasMessage("A agenda deste médico foi alterada por outra pessoa ao mesmo tempo. Tente novamente.");
     }
 
+    @Test
+    void loteIgnoraHorariosParcialmenteSobrepostosEGravaADuracao() {
+        Medico medico = medicoExistente();
+        // 09:15 às 10:15 invade os horários das 09:00 e das 10:00; o das 11:00 fica livre.
+        when(repository.findByMedicoIdAndDataBetween(MEDICO_ID, AMANHA, AMANHA))
+                .thenReturn(List.of(new Agenda(medico, AMANHA, LocalTime.of(9, 15), 60)));
+
+        AgendaService.ResultadoLote resultado = service.gerarEmLote(
+                lote(AMANHA, AMANHA, EnumSet.of(AMANHA.getDayOfWeek()), "09:00", "12:00", 60));
+
+        assertThat(resultado).isEqualTo(new AgendaService.ResultadoLote(1, 2));
+        assertThat(gravadosNoLote()).singleElement().satisfies(agenda -> {
+            assertThat(agenda.getHorario()).isEqualTo(LocalTime.of(11, 0));
+            assertThat(agenda.getDuracaoMinutos()).isEqualTo(60);
+        });
+        verify(medicoService).bloquear(MEDICO_ID);
+    }
+
     // ---------- Apoio ----------
 
     private void assertCampoInvalido(String campo, Consumer<AgendaLoteForm> alteracao) {
@@ -274,6 +354,19 @@ class AgendaServiceTest {
         ArgumentCaptor<List<Agenda>> captor = ArgumentCaptor.forClass(List.class);
         verify(repository).saveAllAndFlush(captor.capture());
         return captor.getValue();
+    }
+
+    private void assertSobreposto(String horario, int duracao) {
+        assertThatThrownBy(() -> service.cadastrar(form(MEDICO_ID, AMANHA, LocalTime.parse(horario), duracao)))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage(AgendaService.HORARIO_SOBREPOSTO)
+                .extracting(e -> ((RegraNegocioException) e).getCampo()).isEqualTo("horario");
+    }
+
+    private static AgendaForm form(Long medicoId, LocalDate data, LocalTime horario, Integer duracao) {
+        AgendaForm form = form(medicoId, data, horario);
+        form.setDuracaoMinutos(duracao);
+        return form;
     }
 
     private Medico medicoExistente() {

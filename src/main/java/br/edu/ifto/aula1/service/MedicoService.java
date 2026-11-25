@@ -6,6 +6,7 @@ import br.edu.ifto.aula1.model.entity.Perfil;
 import br.edu.ifto.aula1.model.repository.AgendaRepository;
 import br.edu.ifto.aula1.model.repository.MedicoRepository;
 import br.edu.ifto.aula1.validation.Credenciais;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,17 @@ public class MedicoService {
 
         return repository.findById(id)
                 .orElseThrow(() -> new RegistroNaoEncontradoException("Médico não encontrado."));
+    }
+
+    /** Bloqueia o médico até o fim da transação de quem chama: serializa as mudanças na agenda dele. */
+    @Transactional
+    public void bloquear(Long id) {
+        try {
+            repository.buscarComBloqueio(id)
+                    .orElseThrow(() -> new RegistroNaoEncontradoException("Médico não encontrado."));
+        } catch (ConcurrencyFailureException e) {
+            throw new RegraNegocioException("A agenda deste médico está sendo alterada. Tente novamente.");
+        }
     }
 
     public boolean existe(Long id) {

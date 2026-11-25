@@ -121,6 +121,41 @@ class AgendaIntegrationTests {
     }
 
     @Test
+    void medicoNaoCadastraHorariosSobrepostos() throws Exception {
+        LocalDate data = dataLivre();
+        agendaService.cadastrar(form(beatriz, data, LocalTime.of(10, 0))); // 10:00 às 10:30
+
+        mvc.perform(post("/agenda/save").with(csrf()).with(contaDaBeatriz)
+                        .param("data", data.toString()).param("horario", "10:15").param("duracaoMinutos", "30"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("se sobrepõe a outro")));
+        // Começa antes, mas invade o das 10:00.
+        mvc.perform(post("/agenda/save").with(csrf()).with(contaDaBeatriz)
+                        .param("data", data.toString()).param("horario", "09:00").param("duracaoMinutos", "61"))
+                .andExpect(content().string(containsString("se sobrepõe a outro")));
+        mvc.perform(post("/agenda/save").with(csrf()).with(contaDaBeatriz)
+                        .param("data", data.toString()).param("horario", "23:50").param("duracaoMinutos", "30"))
+                .andExpect(content().string(containsString("A consulta deve terminar até a meia-noite.")));
+        mvc.perform(post("/agenda/save").with(csrf()).with(contaDaBeatriz)
+                        .param("data", data.toString()).param("horario", "15:00").param("duracaoMinutos", "5"))
+                .andExpect(content().string(containsString("A duração deve ficar entre 10 e 240 minutos.")));
+
+        // Encostados (termina às 10:00; começa às 10:30) não se sobrepõem.
+        for (String horario : List.of("09:30", "10:30"))
+            mvc.perform(post("/agenda/save").with(csrf()).with(contaDaBeatriz)
+                            .param("data", data.toString()).param("horario", horario).param("duracaoMinutos", "30"))
+                    .andExpect(redirectedUrl("/agenda/form"));
+
+        // O lote pula só o que se sobrepõe: 09:00 (até 10:00) e 10:00; gera o das 11:00.
+        mvc.perform(post("/agenda/lote").with(csrf()).with(contaDaBeatriz)
+                        .param("dataInicio", data.toString()).param("dataFim", data.toString())
+                        .param("diasSemana", data.getDayOfWeek().name())
+                        .param("horaInicio", "09:00").param("horaFim", "12:00").param("duracaoMinutos", "60"))
+                .andExpect(flash().attribute("mensagem",
+                        "1 horário gerado. 2 já estavam ocupados na agenda ou já passaram e foram ignorados."));
+    }
+
+    @Test
     void soOMedicoCadastraHorariosNemAtendenteNemAdministracao() throws Exception {
         LocalDate data = dataLivre();
         long total = agendas.count();
@@ -456,6 +491,52 @@ class AgendaIntegrationTests {
 
         assertThat(agendamentos.findByAgendaIdOrderByIdAsc(passado.getId())).isEmpty();
         assertThat(statusDaAgenda(passado)).isEqualTo(StatusAgenda.DISPONIVEL);
+    }
+
+    @Test
+    void pacienteNaoFicaEmDuasConsultasAoMesmoTempo() throws Exception {
+        LocalDate data = dataLivre();
+        Agenda comBeatriz = agendaService.cadastrar(form(beatriz, data, LocalTime.of(9, 0)));
+        Agenda conflito = agendaService.cadastrar(form(eduardo, data, LocalTime.of(9, 15)));
+        Agenda emSeguida = agendaService.cadastrar(form(eduardo, data, LocalTime.of(9, 45)));
+        Agendamento primeiro = agendamentoService.agendar(comBeatriz.getId(), ana.getId());
+
+        mvc.perform(post("/agendamentos/save").with(csrf()).with(recepcao)
+                        .param("agendaId", conflito.getId().toString()).param("pacienteId", ana.getId().toString()))
+                .andExpect(redirectedUrl("/agenda/list"))
+                .andExpect(flash().attribute("erro", "O paciente já tem outra consulta marcada neste horário."));
+        assertThat(statusDaAgenda(conflito)).isEqualTo(StatusAgenda.DISPONIVEL);
+
+        // Sem sobreposição, pode; reagendar para cima de outra consulta, não, e nada muda.
+        Agendamento segundo = agendamentoService.agendar(emSeguida.getId(), ana.getId());
+        assertThatThrownBy(() -> agendamentoService.reagendar(segundo.getId(), conflito.getId(), "atendente"))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessage("O paciente já tem outra consulta marcada neste horário.");
+        assertThat(agendamentos.findById(segundo.getId()).orElseThrow().getStatus()).isEqualTo(StatusAgendamento.AGENDADO);
+
+        // Cancelada a primeira, o horário do paciente fica livre.
+        agendamentoService.cancelar(primeiro.getId(), "atendente", null);
+        agendamentoService.reagendar(segundo.getId(), conflito.getId(), "atendente");
+        assertThat(statusDaAgenda(conflito)).isEqualTo(StatusAgenda.AGENDADO);
+    }
+
+    @Test
+    void marcacoesSimultaneasDoMesmoPacienteSoUmaPassa() throws Exception {
+        LocalDate data = dataLivre();
+        Agenda uma = agendaService.cadastrar(form(beatriz, data, LocalTime.of(9, 0)));
+        Agenda outra = agendaService.cadastrar(form(eduardo, data, LocalTime.of(9, 0)));
+        CountDownLatch largada = new CountDownLatch(1);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> primeira = executor.submit(() -> tentarAgendar(largada, uma, ana));
+            Future<Boolean> segunda = executor.submit(() -> tentarAgendar(largada, outra, ana));
+            largada.countDown();
+            assertThat(List.of(primeira.get(30, TimeUnit.SECONDS), segunda.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

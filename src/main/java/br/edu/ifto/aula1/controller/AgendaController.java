@@ -174,7 +174,7 @@ public class AgendaController {
 
         String mensagem = resultado.gerados() + (resultado.gerados() == 1 ? " horário gerado." : " horários gerados.");
         if (resultado.ignorados() > 0)
-            mensagem += " " + resultado.ignorados() + " já existiam ou já passaram e foram ignorados.";
+            mensagem += " " + resultado.ignorados() + " já estavam ocupados na agenda ou já passaram e foram ignorados.";
         attributes.addFlashAttribute("mensagem", mensagem);
         return new ModelAndView("redirect:/agenda/lote");
     }

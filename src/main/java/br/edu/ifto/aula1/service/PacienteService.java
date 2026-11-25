@@ -6,6 +6,7 @@ import br.edu.ifto.aula1.model.entity.Perfil;
 import br.edu.ifto.aula1.model.repository.AgendamentoRepository;
 import br.edu.ifto.aula1.model.repository.PacienteRepository;
 import br.edu.ifto.aula1.validation.Credenciais;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -73,6 +74,17 @@ public class PacienteService {
 
         return repository.findById(id)
                 .orElseThrow(() -> new RegistroNaoEncontradoException("Paciente não encontrado."));
+    }
+
+    /** Bloqueia o paciente até o fim da transação de quem chama: serializa os agendamentos dele. */
+    @Transactional
+    public void bloquear(Long id) {
+        try {
+            repository.buscarComBloqueio(id)
+                    .orElseThrow(() -> new RegistroNaoEncontradoException("Paciente não encontrado."));
+        } catch (ConcurrencyFailureException e) {
+            throw new RegraNegocioException("Este paciente está sendo alterado por outra pessoa. Tente novamente.");
+        }
     }
 
     public boolean existe(Long id) {
