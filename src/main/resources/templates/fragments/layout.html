@@ -34,6 +34,7 @@
             <a class="nav-link" th:href="@{/consultas/list}" sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Consultas</a>
             <a class="nav-link" th:href="@{/usuario/agendamentos}" sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Meus agendamentos</a>
             <a class="nav-link" th:href="@{/usuario/consultas}" sec:authorize="hasAnyRole('PACIENTE','MEDICO')">Minhas consultas</a>
+            <a class="nav-link" th:href="@{/contas/list}" sec:authorize="hasRole('ADMIN')">Contas</a>
             <a class="nav-link" th:href="@{/auditoria}" sec:authorize="hasRole('ADMIN')">Auditoria</a>
         </div>
     </div>

@@ -54,6 +54,12 @@ public class TentativasLoginService {
         }, () -> auditoria.registrarSeparado(login, AcaoAuditoria.LOGIN_FALHOU, "Usuário inexistente"));
     }
 
+    @Transactional(readOnly = true)
+    public boolean bloqueada(String login) {
+        LocalDateTime agora = LocalDateTime.now(clock);
+        return usuarios.findByLogin(login).map(usuario -> usuario.isBloqueadoEm(agora)).orElse(false);
+    }
+
     /** Chamado a cada autenticação bem-sucedida (inclusive HTTP Basic): só grava se havia falhas. */
     @Transactional
     public void registrarSucesso(String login) {

@@ -12,13 +12,16 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+// Só grava as colunas alteradas: um login simultâneo (contagem de falhas) não desfaz a troca de senha.
 @Entity
+@DynamicUpdate
 @Table(name = "usuarios")
 public class Usuario {
 
@@ -45,6 +48,11 @@ public class Usuario {
     @Column(name = "bloqueado_ate")
     private LocalDateTime bloqueadoAte;
 
+    /** Senha provisória, definida pela administração: precisa ser trocada no próximo acesso. */
+    @ColumnDefault("false")
+    @Column(name = "trocar_senha", nullable = false)
+    private boolean trocarSenha = false;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "usuario_perfil",
             joinColumns = @JoinColumn(name = "usuario_id"),
@@ -65,6 +73,23 @@ public class Usuario {
             perfis.add(perfil);
             perfil.adicionarUsuario(this);
         }
+    }
+
+    /** O dono escolheu uma senha nova (já como hash). */
+    public void trocarSenha(String hash) {
+        this.password = hash;
+        this.trocarSenha = false;
+    }
+
+    /** A administração definiu uma senha provisória (já como hash); desfaz o bloqueio por tentativas. */
+    public void redefinirSenha(String hash) {
+        this.password = hash;
+        this.trocarSenha = true;
+        registrarSucesso();
+    }
+
+    public boolean isTrocarSenha() {
+        return trocarSenha;
     }
 
     public boolean isBloqueadoEm(LocalDateTime agora) {

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Contas')}"></head>
+<body>
+
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+
+<main class="container">
+    <h1 class="h3 mb-3">Contas de acesso</h1>
+
+    <div th:replace="~{fragments/layout :: mensagem}"></div>
+    <div th:replace="~{fragments/layout :: erro}"></div>
+
+    <div class="alert alert-success" role="alert" th:if="${provisoria}">
+        Senha provisória de <strong th:text="${provisoria.login}"></strong>:
+        <code class="fs-5 user-select-all" th:text="${provisoria.senha}"></code><br>
+        Anote agora: ela não será mostrada de novo. A pessoa terá que trocá-la ao entrar.
+    </div>
+
+    <form class="d-flex flex-wrap gap-2 mb-3" method="get" th:action="@{/contas/list}" role="search">
+        <input type="search" class="form-control w-auto" name="busca" th:value="${busca}"
+               placeholder="Usuário" aria-label="Usuário" maxlength="80">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+        <a class="btn btn-outline-secondary" th:href="@{/contas/list}">Limpar</a>
+    </form>
+
+    <div class="alert alert-light border" th:if="${pagina.empty}">Nenhuma conta encontrada.</div>
+
+    <div class="card border-0 shadow-sm" th:unless="${pagina.empty}">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Usuário</th>
+                    <th>Perfis</th>
+                    <th>Situação</th>
+                    <th>Ações</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="conta : ${pagina.content}">
+                    <td th:text="${conta.login}"></td>
+                    <td><span class="badge text-bg-secondary me-1" th:each="perfil : ${conta.perfis}"
+                              th:text="${perfil}"></span></td>
+                    <td>
+                        <span th:text="${conta.ativo} ? 'Ativa' : 'Inativa'"></span>
+                        <span class="badge text-bg-warning" th:if="${conta.senhaProvisoria}">Senha provisória</span>
+                    </td>
+                    <td>
+                        <form th:action="@{/contas/redefinir/{id}(id=${conta.id})}" method="post" class="m-0"
+                              th:if="${conta.login != loginAtual}"
+                              th:attr="data-confirmar=|Redefinir a senha de ${conta.login}? As sessões abertas serão encerradas.|">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Redefinir senha</button>
+                        </form>
+                        <a class="btn btn-sm btn-outline-secondary" th:href="@{/usuario/senha}"
+                           th:if="${conta.login == loginAtual}">Trocar senha</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <nav class="mt-3" aria-label="Páginas de contas" th:if="${pagina.totalPages > 1}">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item" th:classappend="${pagina.first} ? 'disabled'">
+                <a class="page-link" th:href="@{/contas/list(page=${pagina.number - 1}, busca=${busca})}">Anterior</a>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link" th:text="|Página ${pagina.number + 1} de ${pagina.totalPages}|"></span>
+            </li>
+            <li class="page-item" th:classappend="${pagina.last} ? 'disabled'">
+                <a class="page-link" th:href="@{/contas/list(page=${pagina.number + 1}, busca=${busca})}">Próxima</a>
+            </li>
+        </ul>
+    </nav>
+</main>
+
+<script th:src="@{/js/confirmar.js}"></script>
+</body>
+</html>

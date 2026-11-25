@@ -153,6 +153,7 @@ Detalhes em `SECURITY.md`. Em resumo:
 
 - **Bloqueio por tentativas**: 5 senhas erradas seguidas bloqueiam a conta por 15 minutos.
 - **Politica de senha**: 8 a 72 caracteres, letras e numeros, sem conter o usuario.
+- **Senhas**: cada um troca a propria em "Meus dados"; quem esqueceu recebe do ADMIN (`/contas/list`) uma senha provisoria, que precisa ser trocada no proximo acesso. A troca encerra as outras sessoes da conta.
 - **Cabecalhos de seguranca**: Content-Security-Policy sem scripts inline, Referrer-Policy, Permissions-Policy, alem dos padroes do Spring Security.
 - **Auditoria** (`/auditoria`, so ADMIN): quem fez o que e quando, gravada na mesma transacao da operacao.
 - **LGPD**: aceite obrigatorio da politica de privacidade (`/privacidade`) no cadastro, com data registrada; o paciente baixa os proprios dados em JSON em "Meus dados".

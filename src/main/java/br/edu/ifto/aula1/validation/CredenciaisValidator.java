@@ -36,13 +36,18 @@ public class CredenciaisValidator implements Validator {
         if (!erros.hasFieldErrors("login") && usuarios.loginEmUso(credenciais.getLogin()))
             erros.rejectValue("login", "Duplicado", "Este usuário já está em uso.");
 
-        if (!erros.hasFieldErrors("senha")
-                && credenciais.getSenha().getBytes(StandardCharsets.UTF_8).length > LIMITE_BCRYPT_EM_BYTES)
-            erros.rejectValue("senha", "Longa", "A senha é longa demais.");
+        validarSenha("senha", credenciais.getSenha(), credenciais.getLogin(), erros);
+    }
+
+    /** Regras da senha que as anotações não cobrem; "campo" é o nome dela no formulário. */
+    public static void validarSenha(String campo, String senha, String login, Errors erros) {
+        if (!erros.hasFieldErrors(campo)
+                && senha.getBytes(StandardCharsets.UTF_8).length > LIMITE_BCRYPT_EM_BYTES)
+            erros.rejectValue(campo, "Longa", "A senha é longa demais.");
 
         // Senha que contém o próprio usuário é a primeira que alguém tentaria.
-        if (!erros.hasFieldErrors("senha") && credenciais.getLogin() != null
-                && credenciais.getSenha().toLowerCase(Locale.ROOT).contains(credenciais.getLogin().toLowerCase(Locale.ROOT)))
-            erros.rejectValue("senha", "ContemLogin", "A senha não pode conter o nome de usuário.");
+        if (!erros.hasFieldErrors(campo) && login != null
+                && senha.toLowerCase(Locale.ROOT).contains(login.toLowerCase(Locale.ROOT)))
+            erros.rejectValue(campo, "ContemLogin", "A senha não pode conter o nome de usuário.");
     }
 }

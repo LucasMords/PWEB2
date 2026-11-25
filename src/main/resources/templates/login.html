@@ -36,6 +36,9 @@
             <div class="alert alert-danger" role="alert" th:if="${param.error}">
                 Usuário ou senha inválidos. Após 5 tentativas erradas seguidas, a conta fica bloqueada por 15 minutos.
             </div>
+            <div class="alert alert-warning" role="alert" th:if="${param.expirada}">
+                Sua sessão foi encerrada porque a senha da conta mudou. Entre de novo.
+            </div>
             <div class="alert alert-success" role="alert" th:if="${param.logout}">
                 Você saiu do sistema.
             </div>
@@ -65,6 +68,9 @@
             </form>
 
             <p class="text-center text-secondary mt-4 mb-0">
+                Esqueceu a senha? Peça à administração da clínica para redefini-la.
+            </p>
+            <p class="text-center text-secondary mt-2 mb-0">
                 É paciente e ainda não tem conta?
                 <a th:href="@{/pacientes/form}">Cadastre-se</a>
             </p>

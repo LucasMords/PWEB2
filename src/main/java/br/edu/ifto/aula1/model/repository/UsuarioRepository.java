@@ -1,6 +1,8 @@
 package br.edu.ifto.aula1.model.repository;
 
 import br.edu.ifto.aula1.model.entity.Usuario;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +20,11 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findComPerfisByLogin(String login);
 
     boolean existsByLogin(String login);
+
+    /** A conta está com senha provisória, a ser trocada? */
+    boolean existsByLoginAndTrocarSenhaTrue(String login);
+
+    Page<Usuario> findByLoginContainingIgnoreCase(String trecho, Pageable pageable);
 
     /** Com bloqueio pessimista: duas senhas erradas ao mesmo tempo não se perdem na contagem. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

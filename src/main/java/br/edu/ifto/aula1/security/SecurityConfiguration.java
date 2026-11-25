@@ -12,6 +12,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
@@ -32,7 +35,7 @@ import org.springframework.security.web.header.writers.StaticHeadersWriter;
 public class SecurityConfiguration {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SessionRegistry sessoes) throws Exception {
         http
                 // As regras são avaliadas na ordem em que aparecem; anyRequest() fica por último.
                 .authorizeHttpRequests(auth -> auth
@@ -56,6 +59,8 @@ public class SecurityConfiguration {
                         // Exclusões também exigem ADMIN (e são POST, para passarem pela proteção CSRF).
                         .requestMatchers("/medicos/remove/**", "/pacientes/remove/**").hasRole(Perfil.ADMIN)
 
+                        // Redefinição de senha das contas: só a administração.
+                        .requestMatchers("/contas/**").hasRole(Perfil.ADMIN)
                         // Observações são dado de saúde: só o médico edita, e só as das próprias
                         // consultas (o ConsultaService confere de quem é a consulta).
                         .requestMatchers("/consultas/edit/**", "/consultas/update").hasRole(Perfil.MEDICO)
@@ -93,6 +98,9 @@ public class SecurityConfiguration {
                         .permitAll()
                 )
                 .rememberMe(Customizer.withDefaults())
+                // Sem limite de sessões por conta (-1); o registro serve para encerrá-las na troca de senha.
+                .sessionManagement(sessao -> sessao.maximumSessions(-1)
+                        .sessionRegistry(sessoes).expiredUrl("/login?expirada"))
 
                 // CSRF: o padrão do Spring Security, sem exceções.
                 .headers(headers -> headers
@@ -108,6 +116,18 @@ public class SecurityConfiguration {
         // O HSTS (Strict-Transport-Security) já vem ligado e é enviado nas respostas por HTTPS.
 
         return http.build();
+    }
+
+    /** Sessões abertas, para encerrá-las quando a senha muda (SessoesService). */
+    @Bean
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    /** Avisa o SessionRegistry quando uma sessão termina. */
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
     }
 
     static final String POLITICA_DE_CONTEUDO = String.join("; ",

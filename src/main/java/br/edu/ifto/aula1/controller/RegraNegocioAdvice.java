@@ -47,6 +47,8 @@ public class RegraNegocioAdvice {
             return "/agendamentos/list";
         if (caminho.startsWith("/agenda"))
             return "/agenda/list";
+        if (caminho.startsWith("/contas"))
+            return "/contas/list";
         if (caminho.startsWith("/medicos"))
             return "/medicos/list";
         if (caminho.startsWith("/pacientes"))
