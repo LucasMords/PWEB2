@@ -100,6 +100,9 @@ A lista de pacientes e paginada (10 por pagina, em ordem alfabetica) e tem busca
 do nome, sem diferenciar maiusculas, ou pelos digitos do CPF, com ou sem pontuacao. O
 texto e procurado literalmente: `%` e `_` nao funcionam como curingas.
 
+**Fuso horario.** A aplicacao usa o fuso do Tocantins (`America/Araguaina`) em qualquer
+maquina ou container; para trocar, defina a variavel de ambiente `CLINICA_FUSO`.
+
 ## Camadas
 
 | Pacote | Papel |
