@@ -2,7 +2,9 @@
 # com o JRE (imagem menor, sem Maven nem codigo-fonte).
 #
 #   docker build -t clinica .
-#   docker run -p 8080:8080 clinica
+#
+# A aplicacao precisa do PostgreSQL e das variaveis do .env; para subir tudo:
+#   docker compose up --build
 
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /app

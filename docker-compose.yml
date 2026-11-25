@@ -15,7 +15,8 @@ services:
       # Os dados sobrevivem a recriacao do container.
       - dados:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U clinica -d clinica"]
+      # Por TCP: na criacao do volume, o servidor temporario so atende pelo socket.
+      test: ["CMD-SHELL", "pg_isready -h localhost -U clinica -d clinica"]
       interval: 5s
       timeout: 5s
       retries: 10

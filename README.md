@@ -141,7 +141,7 @@ Integridade e concorrencia:
 - Cada escrita comeca lendo com bloqueio pessimista (`SELECT ... FOR UPDATE`, `@Lock(PESSIMISTIC_WRITE)`) o registro que decide a regra: a `Agenda` ao reservar, o `Agendamento` ao cancelar ou confirmar. Dois pacientes disputando o mesmo horario sao atendidos em fila e o segundo recebe "Este horario nao esta mais disponivel". As restricoes unicas ficam como segunda barreira.
 - As regras ficam nos servicos (`AgendaService`, `AgendamentoService`), que lancam `RegraNegocioException`. O `RegraNegocioAdvice` (`@ControllerAdvice`) transforma a excecao em mensagem de erro e redireciona para a listagem; no formulario de horario ela aparece no campo correspondente.
 - Medico com horarios na agenda e paciente com agendamentos nao podem ser excluidos, para preservar o historico.
-- As regras de horario leem a hora por um `java.time.Clock` (bean em `Config.RelogioConfig`), e nao por `LocalDateTime.now()` direto, para que os testes possam fixar o "agora". Na tela, os botoes de confirmar, registrar falta e cancelar so ficam habilitados quando a acao cabe no status e no horario; o servico confere tudo de novo.
+- As regras de horario leem a hora por um `java.time.Clock` (bean em `config.RelogioConfig`), e nao por `LocalDateTime.now()` direto, para que os testes possam fixar o "agora". Na tela, os botoes de confirmar, registrar falta e cancelar so ficam habilitados quando a acao cabe no status e no horario; o servico confere tudo de novo.
 - Os dados de demonstracao (`db/demo`) incluem um agendamento da vespera da migracao ainda pendente (Ana com o Dr. Eduardo), para demonstrar a confirmacao de presenca e o registro de falta.
 
 ## Seguranca e LGPD
