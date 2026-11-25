@@ -30,11 +30,13 @@
                     <th>Médico</th>
                     <th>Agendamento</th>
                     <th>Observações</th>
-                    <th sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">Ações</th>
+                    <th th:if="${medicoDaConta != null}">Ações</th>
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="consulta : ${consultas}">
+                <!-- Observações são dado de saúde: só o paciente e o médico que atendeu leem. -->
+                <tr th:each="consulta : ${consultas}"
+                    th:with="doMedico=${medicoDaConta != null and consulta.medico.id == medicoDaConta}">
                     <td th:text="${#temporals.format(consulta.dataRealizacao, 'dd/MM/yyyy HH:mm')}"></td>
                     <td th:text="${consulta.paciente.nome}"></td>
                     <td th:text="${consulta.medico.nome}"></td>
@@ -43,9 +45,12 @@
                         <span class="text-secondary small d-block"
                               th:text="|Horário marcado: ${#temporals.format(consulta.agendamento.agenda.dataHora, 'dd/MM/yyyy HH:mm')}|"></span>
                     </td>
-                    <td th:text="${consulta.observacoes}"></td>
-                    <td sec:authorize="hasAnyRole('ADMIN','ATENDENTE','MEDICO')">
-                        <a class="btn btn-sm btn-outline-secondary"
+                    <td>
+                        <span th:if="${consultasProprias} or ${doMedico}" th:text="${consulta.observacoes}"></span>
+                        <span class="text-secondary small" th:unless="${consultasProprias} or ${doMedico}">Restritas ao médico</span>
+                    </td>
+                    <td th:if="${medicoDaConta != null}">
+                        <a class="btn btn-sm btn-outline-secondary" th:if="${doMedico}"
                            th:href="@{/consultas/edit/{id}(id=${consulta.id})}">Observações</a>
                     </td>
                 </tr>
