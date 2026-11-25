@@ -12,7 +12,7 @@ Pacote raiz: `br.edu.ifto.aula1`. Branch principal: `master`.
 
 ## Comandos
 
-Exigem `JAVA_HOME` apontando para um JDK 25. No Windows, `mvnw.cmd`; no Git Bash, `./mvnw`.
+Exigem `JAVA_HOME` apontando para um JDK 25. No PowerShell, troque `./mvnw` por `.\mvnw.cmd`; no Git Bash, use `./mvnw`.
 
 | Para | Comando |
 |---|---|
@@ -20,7 +20,7 @@ Exigem `JAVA_HOME` apontando para um JDK 25. No Windows, `mvnw.cmd`; no Git Bash
 | Rodar uma classe de teste | `./mvnw -q test -Dtest=AgendaServiceTest` |
 | Verificação do projeto (a mesma do CI) | `./mvnw -B verify` |
 | Subir a aplicação (precisa do PostgreSQL, `DB_SENHA`) | `./mvnw spring-boot:run` |
-| Subir em outra porta (a 8080 pode estar com a IDE) | `./mvnw spring-boot:run -Dspring-boot.run.arguments=--server.port=8099` |
+| Subir em outra porta (a 8080 pode estar com a IDE) | `./mvnw spring-boot:run "-Dspring-boot.run.arguments=--server.port=8099"` |
 | Aplicação e banco no Docker | `docker compose up --build` (com o `.env`) |
 
 `spring-boot:run` aplica as migrações pendentes no banco local, que é persistente.
@@ -31,9 +31,11 @@ Exigem `JAVA_HOME` apontando para um JDK 25. No Windows, `mvnw.cmd`; no Git Bash
   Pacotes em minúsculas. O `README.md` é escrito sem acentos e o `SECURITY.md`, em inglês.
 - Comentários explicam o porquê, não o que o código já diz.
 - **Camadas:** o controller valida o formulário, chama o serviço e redireciona. Regras e
-  transações ficam no serviço; só ele usa os repositórios.
+  transações ficam no serviço; só ele usa os repositórios. Exceções atuais: as classes de
+  `security` e o `UsuarioController` (não imite este; refatore só se a issue pedir).
 - **Serviços:** injeção pelo construtor; `@Transactional(readOnly = true)` na classe e
-  `@Transactional` nos métodos de escrita. Na edição, altere a entidade gerenciada, sem `save()`.
+  `@Transactional` nos métodos de escrita. Na criação, use `save()`; na edição, altere a
+  entidade gerenciada, sem `save()`.
 - **Erros:** `RegraNegocioException` para regra violada; `RegistroNaoEncontradoException` para 404.
 - **JPA:** repositórios são interfaces `JpaRepository`, sem `@Repository`. Relações `LAZY` e
   `open-in-view` desligado: use `@EntityGraph` ou `join fetch` e evite N+1.
@@ -42,8 +44,8 @@ Exigem `JAVA_HOME` apontando para um JDK 25. No Windows, `mvnw.cmd`; no Git Bash
   bloqueio pessimista; a restrição única do banco é a segunda barreira.
 - **Validação:** sempre no servidor. Formulários com `novalidate`, `th:errorclass` e
   `th:errors`; sucesso por `addFlashAttribute("mensagem", ...)`.
-- **Telas:** reutilize `templates/fragments/layout.html`. A CSP bloqueia scripts inline: todo
-  JavaScript vai em `static/js`.
+- **Telas:** reutilize `templates/fragments/layout.html`. A CSP bloqueia scripts e estilos
+  inline: JavaScript vai em `static/js` e CSS, em `static/css`.
 
 ## Banco
 
@@ -61,7 +63,8 @@ Exigem `JAVA_HOME` apontando para um JDK 25. No Windows, `mvnw.cmd`; no Git Bash
   acessá-la. Não afrouxe CSRF, CSP nem os perfis para fazer algo funcionar.
 - Médico e paciente vêm da conta autenticada, nunca de um id do formulário ou da URL, quando
   a operação é sobre os próprios dados.
-- Operações relevantes são auditadas por `AuditoriaService`, na mesma transação.
+- Operações relevantes são auditadas por `AuditoriaService`, na mesma transação. Login
+  e bloqueio são a exceção: usam `registrarSeparado`, em transação própria, de propósito.
 - Senhas, hashes, observações de consulta e dados de pacientes nunca vão para logs ou auditoria.
   As observações só são lidas pelo paciente e pelo médico que atendeu.
 - Não commite `.env`, `backups/` nem senhas. Use apenas dados fictícios em testes e demonstração.
@@ -90,7 +93,8 @@ Exigem `JAVA_HOME` apontando para um JDK 25. No Windows, `mvnw.cmd`; no Git Bash
 
 ## Antes de concluir
 
-1. Rode todos os testes; informe os que falharem.
+1. Rode a verificação do projeto até tudo passar (PR só de documentação dispensa os testes
+   locais, mas não o CI verde).
 2. Atualize `README.md` ou `SECURITY.md` se o comportamento mudou.
 3. Variável de ambiente nova: inclua em `.env.exemplo` e `docker-compose.yml`.
 4. Só commite trabalho de um plano aprovado, pelo fluxo acima. Commits seguem Conventional
