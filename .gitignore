@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Segredos locais (docker compose) ###
+.env
+
+### Backups do banco ###
+backups/

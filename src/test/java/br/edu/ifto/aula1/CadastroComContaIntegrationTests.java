@@ -1,13 +1,13 @@
 package br.edu.ifto.aula1;
 
-import br.edu.ifto.aula1.Model.Entity.Paciente;
-import br.edu.ifto.aula1.Model.Entity.Perfil;
-import br.edu.ifto.aula1.Model.Entity.Usuario;
-import br.edu.ifto.aula1.Model.repository.MedicoRepository;
-import br.edu.ifto.aula1.Model.repository.PacienteRepository;
-import br.edu.ifto.aula1.Model.repository.UsuarioRepository;
-import br.edu.ifto.aula1.Service.PacienteService;
-import br.edu.ifto.aula1.Validation.Credenciais;
+import br.edu.ifto.aula1.model.entity.Paciente;
+import br.edu.ifto.aula1.model.entity.Perfil;
+import br.edu.ifto.aula1.model.entity.Usuario;
+import br.edu.ifto.aula1.model.repository.MedicoRepository;
+import br.edu.ifto.aula1.model.repository.PacienteRepository;
+import br.edu.ifto.aula1.model.repository.UsuarioRepository;
+import br.edu.ifto.aula1.service.PacienteService;
+import br.edu.ifto.aula1.validation.Credenciais;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -169,7 +169,7 @@ class CadastroComContaIntegrationTests {
 
     @Test
     void pacientesEMedicosDoImportSqlJaTemContaEVeemAsPropriasConsultas() throws Exception {
-        // Os hashes do import.sql correspondem às senhas documentadas e cada conta tem um só perfil.
+        // Os hashes dos dados de demonstração correspondem às senhas documentadas e cada conta tem um só perfil.
         for (String login : new String[]{"ana.souza", "carlos.lima", "mariana.alves"}) {
             Usuario conta = usuarios.findComPerfisByLogin(login).orElseThrow();
             assertThat(passwordEncoder.matches("Paciente123", conta.getPassword())).as(login).isTrue();

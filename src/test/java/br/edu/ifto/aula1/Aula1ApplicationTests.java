@@ -1,14 +1,14 @@
 package br.edu.ifto.aula1;
 
-import br.edu.ifto.aula1.Model.Entity.Consulta;
-import br.edu.ifto.aula1.Model.Entity.Medico;
-import br.edu.ifto.aula1.Model.Entity.Paciente;
-import br.edu.ifto.aula1.Model.Entity.StatusAgendamento;
-import br.edu.ifto.aula1.Model.repository.AgendaRepository;
-import br.edu.ifto.aula1.Model.repository.AgendamentoRepository;
-import br.edu.ifto.aula1.Model.repository.ConsultaRepository;
-import br.edu.ifto.aula1.Model.repository.MedicoRepository;
-import br.edu.ifto.aula1.Model.repository.PacienteRepository;
+import br.edu.ifto.aula1.model.entity.Consulta;
+import br.edu.ifto.aula1.model.entity.Medico;
+import br.edu.ifto.aula1.model.entity.Paciente;
+import br.edu.ifto.aula1.model.entity.StatusAgendamento;
+import br.edu.ifto.aula1.model.repository.AgendaRepository;
+import br.edu.ifto.aula1.model.repository.AgendamentoRepository;
+import br.edu.ifto.aula1.model.repository.ConsultaRepository;
+import br.edu.ifto.aula1.model.repository.MedicoRepository;
+import br.edu.ifto.aula1.model.repository.PacienteRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,7 +46,7 @@ class Aula1ApplicationTests {
         Paciente ana = pacientes.findByUsuarioLogin("ana.souza").orElseThrow();
         Medico eduardo = medicos.findByUsuarioLogin("eduardo.melo").orElseThrow();
 
-        // Consulta do import.sql: Ana com o Dr. Eduardo. O @EntityGraph traz o caminho inteiro,
+        // Consulta dos dados de demonstração: Ana com o Dr. Eduardo. O @EntityGraph traz o caminho inteiro,
         // então os nomes podem ser lidos fora de uma transação.
         Consulta consulta = consultas.findByAgendamentoPacienteIdOrderByDataRealizacaoDesc(ana.getId()).stream()
                 .filter(c -> "Consulta de rotina.".equals(c.getObservacoes()))

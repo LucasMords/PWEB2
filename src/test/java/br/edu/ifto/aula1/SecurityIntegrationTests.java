@@ -1,8 +1,8 @@
 package br.edu.ifto.aula1;
 
-import br.edu.ifto.aula1.Model.Entity.Usuario;
-import br.edu.ifto.aula1.Model.repository.PerfilRepository;
-import br.edu.ifto.aula1.Model.repository.UsuarioRepository;
+import br.edu.ifto.aula1.model.entity.Usuario;
+import br.edu.ifto.aula1.model.repository.PerfilRepository;
+import br.edu.ifto.aula1.model.repository.UsuarioRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

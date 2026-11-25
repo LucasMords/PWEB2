@@ -1,17 +1,47 @@
-# Sobe a aplicacao localmente com o perfil de producao: docker compose up --build
-# Acesse http://localhost:8080 (as contas iniciais estao no SECURITY.md).
+# Sobe a aplicacao e o PostgreSQL com o perfil de producao:
+#
+#   copy .env.exemplo .env     (e troque as senhas)
+#   docker compose up --build
+#
+# Acesse http://localhost:8080 e entre como admin, com a senha de CLINICA_SENHA_ADMIN.
 services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: clinica
+      POSTGRES_USER: clinica
+      POSTGRES_PASSWORD: ${DB_SENHA:?defina DB_SENHA no arquivo .env}
+    volumes:
+      # Os dados sobrevivem a recriacao do container.
+      - dados:/var/lib/postgresql
+    healthcheck:
+      # Por TCP: na criacao do volume, o servidor temporario so atende pelo socket.
+      test: ["CMD-SHELL", "pg_isready -h localhost -U clinica -d clinica"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   clinica:
     build: .
     image: clinica
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/clinica
+      DB_USUARIO: clinica
+      DB_SENHA: ${DB_SENHA:?defina DB_SENHA no arquivo .env}
+      CLINICA_SENHA_ADMIN: ${CLINICA_SENHA_ADMIN:?defina CLINICA_SENHA_ADMIN no arquivo .env}
+      CLINICA_SENHA_ATENDENTE: ${CLINICA_SENHA_ATENDENTE:-}
     volumes:
       # Os arquivos de log sobrevivem a recriacao do container.
       - logs:/app/logs
     restart: unless-stopped
 
 volumes:
+  dados:
   logs:
