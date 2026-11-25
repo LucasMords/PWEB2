@@ -540,6 +540,25 @@ class AgendaIntegrationTests {
     }
 
     @Test
+    void cadastrosSimultaneosSobrepostosDoMesmoMedicoSoUmPassa() throws Exception {
+        LocalDate data = dataLivre();
+        CountDownLatch largada = new CountDownLatch(1);
+
+        // Horários diferentes: a restrição única não os barra, só o bloqueio do médico.
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> primeiro = executor.submit(() -> tentarCadastrar(largada, data, LocalTime.of(9, 0)));
+            Future<Boolean> segundo = executor.submit(() -> tentarCadastrar(largada, data, LocalTime.of(9, 15)));
+            largada.countDown();
+            assertThat(List.of(primeiro.get(30, TimeUnit.SECONDS), segundo.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+        } finally {
+            executor.shutdownNow();
+        }
+        assertThat(agendas.findByMedicoIdAndDataBetween(beatriz.getId(), data, data)).hasSize(1);
+    }
+
+    @Test
     void doisPacientesSimultaneosSoUmFicaComOHorario() throws Exception {
         Agenda agenda = novoHorario(beatriz);
         CountDownLatch largada = new CountDownLatch(1);
@@ -975,6 +994,16 @@ class AgendaIntegrationTests {
     }
 
     // ---------- Apoio ----------
+
+    private boolean tentarCadastrar(CountDownLatch largada, LocalDate data, LocalTime horario) throws InterruptedException {
+        largada.await();
+        try {
+            agendaService.cadastrar(form(beatriz, data, horario));
+            return true;
+        } catch (RegraNegocioException e) {
+            return false;
+        }
+    }
 
     private boolean tentarAgendar(CountDownLatch largada, Agenda agenda, Paciente paciente) throws InterruptedException {
         largada.await();

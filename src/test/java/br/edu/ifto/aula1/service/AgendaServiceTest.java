@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -36,6 +37,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -177,8 +180,28 @@ class AgendaServiceTest {
         assertSobreposto("09:15", 30);  // contido
         assertSobreposto("08:30", 120); // contém
         verify(repository, never()).saveAndFlush(any());
-        // A agenda do médico é bloqueada antes da conferência.
         verify(medicoService, times(4)).bloquear(MEDICO_ID);
+    }
+
+    @Test
+    void cadastroELoteBloqueiamOMedicoAntesDeConferirAAgenda() {
+        medicoExistente();
+        when(repository.saveAndFlush(any(Agenda.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.cadastrar(form(MEDICO_ID, AMANHA, NOVE_HORAS));
+        InOrder noCadastro = inOrder(medicoService, repository);
+        noCadastro.verify(medicoService).bloquear(MEDICO_ID);
+        noCadastro.verify(repository).existsByMedicoIdAndDataAndHorario(MEDICO_ID, AMANHA, NOVE_HORAS);
+        noCadastro.verify(repository).findByMedicoIdAndDataBetween(MEDICO_ID, AMANHA, AMANHA);
+        noCadastro.verify(repository).saveAndFlush(any());
+
+        clearInvocations(medicoService, repository);
+        AgendaLoteForm lote = loteValido();
+        service.gerarEmLote(lote);
+        InOrder noLote = inOrder(medicoService, repository);
+        noLote.verify(medicoService).bloquear(MEDICO_ID);
+        noLote.verify(repository).findByMedicoIdAndDataBetween(MEDICO_ID, lote.getDataInicio(), lote.getDataFim());
+        noLote.verify(repository).saveAllAndFlush(anyList());
     }
 
     @Test

@@ -30,8 +30,10 @@ import java.util.Optional;
  * Regras de agendamento, cancelamento, confirmação de presença e registro de falta.
  *
  * Concorrência: cada operação de escrita começa lendo, com bloqueio pessimista
- * (SELECT ... FOR UPDATE), o registro que decide a regra: a Agenda ao reservar, o
- * Agendamento ao cancelar, confirmar ou registrar falta. Quem chega depois espera o commit
+ * (SELECT ... FOR UPDATE), o registro que decide a regra: a Agenda e depois o
+ * Paciente ao agendar; o Agendamento, a nova Agenda e depois o Paciente ao reagendar; o
+ * Agendamento ao cancelar, confirmar ou registrar falta. A ordem evita impasse (deadlock);
+ * o cadastro de horários bloqueia só o Médico (ver AgendaService). Quem chega depois espera o commit
  * de quem chegou primeiro e então lê o estado já atualizado, de modo que a verificação de
  * status feita aqui vale até o fim da transação. As restrições únicas do banco (um
  * agendamento ativo por horário, uma consulta por agendamento) ficam como segunda barreira.

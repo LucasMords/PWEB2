@@ -22,7 +22,7 @@ public interface AgendaRepository extends JpaRepository<Agenda, Long> {
 
     boolean existsByMedicoId(Long medicoId);
 
-    /** Horários já cadastrados do médico no período, para a geração em lote pular os repetidos. */
+    /** Horários já cadastrados do médico no período, para conferir sobreposição no cadastro e na geração em lote. */
     List<Agenda> findByMedicoIdAndDataBetween(Long medicoId, LocalDate inicio, LocalDate fim);
 
     /** Todos os horários do dia (livres ou não), com o médico, para a agenda do dia. */
