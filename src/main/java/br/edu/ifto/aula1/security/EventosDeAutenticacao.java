@@ -3,6 +3,7 @@ package br.edu.ifto.aula1.security;
 import br.edu.ifto.aula1.model.entity.AcaoAuditoria;
 import br.edu.ifto.aula1.service.AuditoriaService;
 import org.springframework.context.event.EventListener;
+import org.springframework.security.authentication.RememberMeAuthenticationToken;
 import org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
 import org.springframework.security.authentication.event.InteractiveAuthenticationSuccessEvent;
@@ -32,6 +33,9 @@ public class EventosDeAutenticacao {
 
     @EventListener
     public void autenticou(AuthenticationSuccessEvent evento) {
+        // O remember-me não confere a senha: não vale como acerto.
+        if (evento.getAuthentication() instanceof RememberMeAuthenticationToken)
+            return;
         tentativas.registrarSucesso(evento.getAuthentication().getName());
     }
 

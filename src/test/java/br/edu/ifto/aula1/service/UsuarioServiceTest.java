@@ -4,6 +4,8 @@ import br.edu.ifto.aula1.model.entity.AcaoAuditoria;
 import br.edu.ifto.aula1.model.entity.Usuario;
 import br.edu.ifto.aula1.model.repository.PerfilRepository;
 import br.edu.ifto.aula1.model.repository.UsuarioRepository;
+import br.edu.ifto.aula1.security.TentativasLoginService;
+import br.edu.ifto.aula1.service.UsuarioService.ResultadoTroca;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +41,7 @@ class UsuarioServiceTest {
     @Mock private PerfilRepository perfis;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuditoriaService auditoria;
+    @Mock private TentativasLoginService tentativas;
     @InjectMocks private UsuarioService service;
 
     private Usuario conta;
@@ -47,16 +50,17 @@ class UsuarioServiceTest {
     void contaExistente() {
         conta = new Usuario(LOGIN, "hash-antigo", true);
         ReflectionTestUtils.setField(conta, "id", ID);
-        lenient().when(usuarios.findById(ID)).thenReturn(Optional.of(conta));
-        lenient().when(usuarios.findByLogin(LOGIN)).thenReturn(Optional.of(conta));
+        lenient().when(usuarios.buscarPorIdComBloqueio(ID)).thenReturn(Optional.of(conta));
+        lenient().when(usuarios.buscarComBloqueio(LOGIN)).thenReturn(Optional.of(conta));
         lenient().when(passwordEncoder.encode(anyString())).thenAnswer(c -> "hash:" + c.getArgument(0));
     }
 
     @Test
     void trocarGravaOHashTiraAMarcaDeProvisoriaEAudita() {
         conta.redefinirSenha("hash-provisorio");
+        when(passwordEncoder.matches("provisoria", "hash-provisorio")).thenReturn(true);
 
-        service.trocarSenha(LOGIN, "Segunda-5678");
+        assertThat(service.trocarSenha(LOGIN, "provisoria", "Segunda-5678")).isEqualTo(ResultadoTroca.TROCADA);
 
         assertThat(conta.getPassword()).isEqualTo("hash:Segunda-5678");
         assertThat(conta.isTrocarSenha()).isFalse();
@@ -71,6 +75,7 @@ class UsuarioServiceTest {
 
         UsuarioService.SenhaProvisoria provisoria = service.redefinirSenha(ID, "admin");
 
+        assertThat(provisoria.toString()).contains(LOGIN).doesNotContain(provisoria.senha());
         assertThat(provisoria.login()).isEqualTo(LOGIN);
         assertThat(conta.getPassword()).isEqualTo("hash:" + provisoria.senha());
         assertThat(conta.isTrocarSenha()).isTrue();
@@ -89,7 +94,7 @@ class UsuarioServiceTest {
 
     @Test
     void naoRedefineAPropriaSenhaNemContaInexistente() {
-        when(usuarios.findById(99L)).thenReturn(Optional.empty());
+        when(usuarios.buscarPorIdComBloqueio(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.redefinirSenha(ID, LOGIN)).isInstanceOf(RegraNegocioException.class);
         assertThatThrownBy(() -> service.redefinirSenha(99L, "admin"))
@@ -100,10 +105,21 @@ class UsuarioServiceTest {
     }
 
     @Test
-    void confereASenhaPeloHash() {
-        when(passwordEncoder.matches("certa", "hash-antigo")).thenReturn(true);
+    void senhaAtualErradaContaComoFalhaENaoTroca() {
+        assertThat(service.trocarSenha(LOGIN, "errada", "Segunda-5678")).isEqualTo(ResultadoTroca.SENHA_INCORRETA);
 
-        assertThat(service.senhaConfere(LOGIN, "certa")).isTrue();
-        assertThat(service.senhaConfere(LOGIN, "errada")).isFalse();
+        verify(tentativas).registrarFalha(LOGIN);
+        assertThat(conta.getPassword()).isEqualTo("hash-antigo");
+        verifyNoInteractions(auditoria);
+    }
+
+    @Test
+    void contaBloqueadaNaoTrocaNemConfereASenha() {
+        when(tentativas.bloqueada(LOGIN)).thenReturn(true);
+
+        assertThat(service.trocarSenha(LOGIN, "certa", "Segunda-5678")).isEqualTo(ResultadoTroca.CONTA_BLOQUEADA);
+
+        verifyNoInteractions(passwordEncoder, auditoria);
+        verify(tentativas, never()).registrarFalha(any());
     }
 }

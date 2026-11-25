@@ -1,11 +1,12 @@
 package br.edu.ifto.aula1.service;
 
+import br.edu.ifto.aula1.model.entity.AcaoAuditoria;
 import br.edu.ifto.aula1.model.entity.Perfil;
 import br.edu.ifto.aula1.model.entity.Usuario;
 import br.edu.ifto.aula1.model.repository.PerfilRepository;
 import br.edu.ifto.aula1.model.repository.UsuarioRepository;
+import br.edu.ifto.aula1.security.TentativasLoginService;
 import br.edu.ifto.aula1.validation.Credenciais;
-import br.edu.ifto.aula1.model.entity.AcaoAuditoria;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -26,6 +27,7 @@ public class UsuarioService {
     private final PerfilRepository perfis;
     private final PasswordEncoder passwordEncoder;
     private final AuditoriaService auditoria;
+    private final TentativasLoginService tentativas;
 
     // Sem caracteres que se confundem ao ditar ou copiar (0/O, 1/l/I).
     private static final String LETRAS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
@@ -34,7 +36,8 @@ public class UsuarioService {
     private static final SecureRandom SORTEIO = new SecureRandom();
 
     public UsuarioService(UsuarioRepository usuarios, PerfilRepository perfis, PasswordEncoder passwordEncoder,
-                          AuditoriaService auditoria) {
+                          AuditoriaService auditoria, TentativasLoginService tentativas) {
+        this.tentativas = tentativas;
         this.auditoria = auditoria;
         this.usuarios = usuarios;
         this.perfis = perfis;
@@ -46,6 +49,16 @@ public class UsuarioService {
     }
 
     public record SenhaProvisoria(String login, String senha) {
+
+        /** Sem a senha, para que ela não vá parar em um log. */
+        @Override
+        public String toString() {
+            return "SenhaProvisoria[login=" + login + "]";
+        }
+    }
+
+    public enum ResultadoTroca {
+        TROCADA, SENHA_INCORRETA, CONTA_BLOQUEADA
     }
 
     public Page<Conta> listarContas(String busca, int pagina, int tamanho) {
@@ -55,20 +68,30 @@ public class UsuarioService {
                         u.getPerfis().stream().map(Perfil::getNome).sorted().toList()));
     }
 
-    public boolean senhaConfere(String login, String senha) {
-        return passwordEncoder.matches(senha, buscar(login).getPassword());
-    }
-
     public boolean senhaProvisoria(String login) {
         return usuarios.existsByLoginAndTrocarSenhaTrue(login);
     }
 
-    /** Troca da própria senha; quem chama já conferiu a senha atual. */
+    /**
+     * Troca da própria senha. A atual é conferida com a conta já bloqueada (pessimista), para
+     * não gravar por cima de uma redefinição simultânea. Uma sessão deixada aberta não pode
+     * servir para descobrir a senha por tentativa e erro: as falhas contam para o mesmo
+     * bloqueio do login. O resultado é devolvido, e não lançado, porque uma exceção desfaria
+     * essa contagem.
+     */
     @Transactional
-    public void trocarSenha(String login, String novaSenha) {
-        Usuario usuario = buscar(login);
+    public ResultadoTroca trocarSenha(String login, String senhaAtual, String novaSenha) {
+        Usuario usuario = usuarios.buscarComBloqueio(login)
+                .orElseThrow(() -> new RegistroNaoEncontradoException("Usuário não encontrado."));
+        if (tentativas.bloqueada(login))
+            return ResultadoTroca.CONTA_BLOQUEADA;
+        if (!passwordEncoder.matches(senhaAtual, usuario.getPassword())) {
+            tentativas.registrarFalha(login);
+            return ResultadoTroca.SENHA_INCORRETA;
+        }
         usuario.trocarSenha(passwordEncoder.encode(novaSenha));
         auditoria.registrar(AcaoAuditoria.SENHA_ALTERADA, "Usuario", usuario.getId(), null);
+        return ResultadoTroca.TROCADA;
     }
 
     /**
@@ -77,7 +100,7 @@ public class UsuarioService {
      */
     @Transactional
     public SenhaProvisoria redefinirSenha(Long id, String administrador) {
-        Usuario usuario = usuarios.findById(id)
+        Usuario usuario = usuarios.buscarPorIdComBloqueio(id)
                 .orElseThrow(() -> new RegistroNaoEncontradoException("Usuário não encontrado."));
         if (usuario.getLogin().equals(administrador))
             throw new RegraNegocioException("Para a própria conta, use \"Trocar senha\" em Meus dados.");
@@ -99,11 +122,6 @@ public class UsuarioService {
         StringBuilder senha = new StringBuilder();
         caracteres.forEach(senha::append);
         return senha.toString();
-    }
-
-    private Usuario buscar(String login) {
-        return usuarios.findByLogin(login)
-                .orElseThrow(() -> new RegistroNaoEncontradoException("Usuário não encontrado."));
     }
 
     public boolean loginEmUso(String login) {

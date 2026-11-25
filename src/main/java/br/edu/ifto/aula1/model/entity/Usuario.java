@@ -11,6 +11,7 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.DynamicUpdate;
 
@@ -53,6 +54,8 @@ public class Usuario {
     @Column(name = "trocar_senha", nullable = false)
     private boolean trocarSenha = false;
 
+    // Em lote: a listagem paginada de contas não faz uma consulta por conta.
+    @BatchSize(size = 20)
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "usuario_perfil",
             joinColumns = @JoinColumn(name = "usuario_id"),
@@ -75,10 +78,11 @@ public class Usuario {
         }
     }
 
-    /** O dono escolheu uma senha nova (já como hash). */
+    /** O dono, que acertou a senha atual, escolheu uma nova (já como hash); esquece as falhas anteriores. */
     public void trocarSenha(String hash) {
         this.password = hash;
         this.trocarSenha = false;
+        registrarSucesso();
     }
 
     /** A administração definiu uma senha provisória (já como hash); desfaz o bloqueio por tentativas. */

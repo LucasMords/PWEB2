@@ -30,4 +30,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from Usuario u where u.login = :login")
     Optional<Usuario> buscarComBloqueio(@Param("login") String login);
+
+    /** Com bloqueio pessimista: a redefinição da senha e a troca pelo dono não se sobrepõem. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from Usuario u where u.id = :id")
+    Optional<Usuario> buscarPorIdComBloqueio(@Param("id") Long id);
 }

@@ -23,11 +23,11 @@ import org.springframework.security.web.header.writers.StaticHeadersWriter;
 /**
  * Quem acessa o quê:
  * - visitante: página de login, cadastro de paciente e a verificação de saúde (/actuator/health);
- * - PACIENTE: início e os próprios dados, agendamentos e consultas, só para leitura;
+ * - PACIENTE: início e os próprios dados, agendamentos e consultas, só para leitura, e a troca da própria senha;
  * - MEDICO: cadastra os horários disponíveis da própria agenda;
  * - ATENDENTE: marca, cancela e reagenda consultas, confirma presença e registra falta;
  * - ADMIN, ATENDENTE e MEDICO: pacientes, consultas, a lista de médicos e a agenda;
- * - ADMIN: cadastro de médicos, exclusões e auditoria (a conta admin
+ * - ADMIN: cadastro de médicos, exclusões, auditoria e redefinição de senhas (a conta admin
  *   também tem o perfil ATENDENTE).
  */
 @Configuration
@@ -80,7 +80,7 @@ public class SecurityConfiguration {
                                 .hasAnyRole(Perfil.ADMIN, Perfil.ATENDENTE, Perfil.MEDICO)
 
                         // O restante (início e /usuario/**: os dados, os agendamentos e as consultas de
-                        // quem está logado, só para leitura) exige apenas estar autenticado.
+                        // quem está logado, só para leitura, e a troca da própria senha) exige apenas estar autenticado.
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form

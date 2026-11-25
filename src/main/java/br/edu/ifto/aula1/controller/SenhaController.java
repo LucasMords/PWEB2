@@ -2,7 +2,6 @@ package br.edu.ifto.aula1.controller;
 
 import br.edu.ifto.aula1.dto.TrocaSenhaForm;
 import br.edu.ifto.aula1.security.SessoesService;
-import br.edu.ifto.aula1.security.TentativasLoginService;
 import br.edu.ifto.aula1.service.UsuarioService;
 import br.edu.ifto.aula1.validation.CredenciaisValidator;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,12 +24,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class SenhaController {
 
     private final UsuarioService service;
-    private final TentativasLoginService tentativas;
     private final SessoesService sessoes;
 
-    public SenhaController(UsuarioService service, TentativasLoginService tentativas, SessoesService sessoes) {
+    public SenhaController(UsuarioService service, SessoesService sessoes) {
         this.service = service;
-        this.tentativas = tentativas;
         this.sessoes = sessoes;
     }
 
@@ -52,20 +49,17 @@ public class SenhaController {
         if (!result.hasFieldErrors("confirmacao") && !form.getConfirmacao().equals(form.getNovaSenha()))
             result.rejectValue("confirmacao", "Diferente", "As senhas não são iguais.");
 
-        // Uma sessão deixada aberta não pode servir para descobrir a senha por tentativa e erro:
-        // as falhas contam para o mesmo bloqueio do login.
         if (!result.hasErrors()) {
-            if (tentativas.bloqueada(login)) {
-                result.rejectValue("senhaAtual", "Bloqueada", "Muitas tentativas. Tente de novo em alguns minutos.");
-            } else if (!service.senhaConfere(login, form.getSenhaAtual())) {
-                tentativas.registrarFalha(login);
-                result.rejectValue("senhaAtual", "Incorreta", "A senha atual está incorreta.");
+            switch (service.trocarSenha(login, form.getSenhaAtual(), form.getNovaSenha())) {
+                case CONTA_BLOQUEADA ->
+                        result.rejectValue("senhaAtual", "Bloqueada", "Muitas tentativas. Tente de novo em alguns minutos.");
+                case SENHA_INCORRETA -> result.rejectValue("senhaAtual", "Incorreta", "A senha atual está incorreta.");
+                case TROCADA -> { }
             }
         }
         if (result.hasErrors())
             return formulario(autenticacao, model);
 
-        service.trocarSenha(login, form.getNovaSenha());
         HttpSession sessao = request.getSession(false);
         sessoes.encerrar(login, sessao == null ? null : sessao.getId());
 
