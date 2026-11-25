@@ -1,6 +1,9 @@
 package br.edu.ifto.aula1.dto;
 
+import br.edu.ifto.aula1.model.entity.Agenda;
 import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -25,6 +28,19 @@ public class AgendaForm {
     @NotNull(message = "Informe o horário.")
     @DateTimeFormat(pattern = "HH:mm")
     private LocalTime horario;
+
+    @NotNull(message = "Informe a duração.")
+    @Min(value = 10, message = "A duração deve ficar entre 10 e 240 minutos.")
+    @Max(value = 240, message = "A duração deve ficar entre 10 e 240 minutos.")
+    private Integer duracaoMinutos = Agenda.DURACAO_PADRAO_MINUTOS;
+
+    public Integer getDuracaoMinutos() {
+        return duracaoMinutos;
+    }
+
+    public void setDuracaoMinutos(Integer duracaoMinutos) {
+        this.duracaoMinutos = duracaoMinutos;
+    }
 
     public Long getMedicoId() {
         return medicoId;

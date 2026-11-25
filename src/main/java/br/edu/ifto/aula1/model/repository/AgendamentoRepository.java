@@ -44,6 +44,18 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
                                         @Param("medicoId") Long medicoId,
                                         @Param("cancelado") StatusAgendamento cancelado);
 
+    /** Agendamentos do paciente que ocupam horários do dia (todos menos os cancelados), com o horário. */
+    @Query("""
+            select ag from Agendamento ag
+              join fetch ag.agenda a
+            where ag.paciente.id = :pacienteId
+              and a.data = :data
+              and ag.status <> :cancelado
+            """)
+    List<Agendamento> buscarAtivosDoPacienteNoDia(@Param("pacienteId") Long pacienteId,
+                                                  @Param("data") LocalDate data,
+                                                  @Param("cancelado") StatusAgendamento cancelado);
+
     /** Agendamentos do paciente com este status a partir de um instante, do mais próximo ao mais distante. */
     @Query("""
             select ag from Agendamento ag

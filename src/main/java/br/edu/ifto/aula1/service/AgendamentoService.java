@@ -30,8 +30,10 @@ import java.util.Optional;
  * Regras de agendamento, cancelamento, confirmação de presença e registro de falta.
  *
  * Concorrência: cada operação de escrita começa lendo, com bloqueio pessimista
- * (SELECT ... FOR UPDATE), o registro que decide a regra: a Agenda ao reservar, o
- * Agendamento ao cancelar, confirmar ou registrar falta. Quem chega depois espera o commit
+ * (SELECT ... FOR UPDATE), o registro que decide a regra: a Agenda e depois o
+ * Paciente ao agendar; o Agendamento, a nova Agenda e depois o Paciente ao reagendar; o
+ * Agendamento ao cancelar, confirmar ou registrar falta. A ordem evita impasse (deadlock);
+ * o cadastro de horários bloqueia só o Médico (ver AgendaService). Quem chega depois espera o commit
  * de quem chegou primeiro e então lê o estado já atualizado, de modo que a verificação de
  * status feita aqui vale até o fim da transação. As restrições únicas do banco (um
  * agendamento ativo por horário, uma consulta por agendamento) ficam como segunda barreira.
@@ -41,6 +43,7 @@ import java.util.Optional;
 public class AgendamentoService {
 
     static final String PRESENCA_JA_CONFIRMADA = "A presença deste agendamento já foi confirmada.";
+    static final String PACIENTE_OCUPADO = "O paciente já tem outra consulta marcada neste horário.";
     static final String FALTA_JA_REGISTRADA = "A falta deste agendamento já foi registrada.";
 
     private static final DateTimeFormatter DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -100,6 +103,8 @@ public class AgendamentoService {
         Paciente paciente = pacienteService.buscar(pacienteId);
         Agenda agenda = bloquearAgenda(agendaId);
         exigirLivre(agenda);
+        exigirFuturo(agenda, agora());
+        exigirPacienteLivre(paciente, agenda, null);
         Agendamento agendamento = reservar(agenda, paciente, agora());
         auditar(AcaoAuditoria.AGENDAMENTO_CRIADO, agendamento, "Paciente " + paciente.getId() + ", " + descrever(agenda));
         return agendamento;
@@ -152,8 +157,8 @@ public class AgendamentoService {
                     + "Para trocar de médico, cancele e faça um novo agendamento.");
         exigirLivre(nova);
         LocalDateTime agora = agora();
-        if (!nova.getDataHora().isAfter(agora))
-            throw new RegraNegocioException("Não é possível agendar um horário que já passou.");
+        exigirFuturo(nova, agora);
+        exigirPacienteLivre(atual.getPaciente(), nova, atual);
 
         // Só depois de tudo conferido: nenhuma exceção abaixo deixa o agendamento atual pela metade.
         cancelar(atual, por, "Reagendado para " + nova.getData().format(DATA) + " às " + nova.getHorario().format(HORA) + ".");
@@ -163,11 +168,28 @@ public class AgendamentoService {
         return novo;
     }
 
-    /** Horário já bloqueado e conferido como livre: confere que é futuro, reserva e grava o agendamento. */
-    private Agendamento reservar(Agenda agenda, Paciente paciente, LocalDateTime agora) {
+    /**
+     * O paciente não pode estar em dois atendimentos ao mesmo tempo, ainda que com médicos
+     * diferentes. A linha dele fica bloqueada até o commit, para que duas marcações
+     * simultâneas não passem juntas. "ignorado" é o agendamento que está sendo reagendado.
+     */
+    private void exigirPacienteLivre(Paciente paciente, Agenda agenda, Agendamento ignorado) {
+        pacienteService.bloquear(paciente.getId());
+        boolean ocupado = repository
+                .buscarAtivosDoPacienteNoDia(paciente.getId(), agenda.getData(), StatusAgendamento.CANCELADO).stream()
+                .filter(outro -> ignorado == null || !Objects.equals(outro.getId(), ignorado.getId()))
+                .anyMatch(outro -> outro.getAgenda().sobrepoe(agenda));
+        if (ocupado)
+            throw new RegraNegocioException(PACIENTE_OCUPADO);
+    }
+
+    private static void exigirFuturo(Agenda agenda, LocalDateTime agora) {
         if (!agenda.getDataHora().isAfter(agora))
             throw new RegraNegocioException("Não é possível agendar um horário que já passou.");
+    }
 
+    /** Horário já bloqueado e conferido (livre e futuro): reserva e grava o agendamento. */
+    private Agendamento reservar(Agenda agenda, Paciente paciente, LocalDateTime agora) {
         agenda.reservar();
         try {
             // O flush antecipa o INSERT para que a restrição única do banco seja conferida aqui.

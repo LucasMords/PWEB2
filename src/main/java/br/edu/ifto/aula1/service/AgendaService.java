@@ -23,7 +23,7 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
 public class AgendaService {
 
     static final String HORARIO_INDISPONIVEL = "Este horário não está mais disponível.";
+    static final String HORARIO_SOBREPOSTO = "Este horário se sobrepõe a outro já cadastrado na sua agenda.";
+    static final String DURACAO_INVALIDA = "A duração deve ficar entre 10 e 240 minutos.";
     static final String HORARIO_DUPLICADO = "Este médico já tem um horário cadastrado nesta data e hora.";
 
     /** Limites da geração em lote, para que um erro de digitação não crie milhares de horários. */
@@ -89,6 +91,7 @@ public class AgendaService {
             throw new RegraNegocioException("data", "Informe a data.");
         if (form.getHorario() == null)
             throw new RegraNegocioException("horario", "Informe o horário.");
+        exigirDuracao(form.getDuracaoMinutos());
 
         LocalDate data = form.getData();
         // Segundos não fazem parte de um horário de agenda; sem eles, 08:00 e 08:00:30 são o mesmo horário.
@@ -100,13 +103,21 @@ public class AgendaService {
         if (!LocalDateTime.of(data, horario).isAfter(agora))
             throw new RegraNegocioException("horario", "O horário já passou.");
 
+        // Bloqueado até o commit: dois cadastros na mesma agenda não passam juntos pela conferência abaixo.
+        medicoService.bloquear(form.getMedicoId());
         Medico medico = medicoService.buscar(form.getMedicoId());
         if (repository.existsByMedicoIdAndDataAndHorario(medico.getId(), data, horario))
             throw new RegraNegocioException("horario", HORARIO_DUPLICADO);
 
+        Agenda novo = new Agenda(medico, data, horario, form.getDuracaoMinutos());
+        if (!novo.terminaNoMesmoDia())
+            throw new RegraNegocioException("duracaoMinutos", "A consulta deve terminar até a meia-noite.");
+        if (repository.findByMedicoIdAndDataBetween(medico.getId(), data, data).stream().anyMatch(novo::sobrepoe))
+            throw new RegraNegocioException("horario", HORARIO_SOBREPOSTO);
+
         try {
             // O flush antecipa o INSERT para que a restrição única do banco seja conferida aqui.
-            Agenda agenda = repository.saveAndFlush(new Agenda(medico, data, horario));
+            Agenda agenda = repository.saveAndFlush(novo);
             auditoria.registrar(AcaoAuditoria.HORARIO_CADASTRADO, "Agenda", agenda.getId(),
                     "Médico " + medico.getId() + ", " + data + " " + horario);
             return agenda;
@@ -118,41 +129,43 @@ public class AgendaService {
         }
     }
 
-    /** Quantos horários a geração em lote criou e quantos pulou (já existiam ou já passaram). */
+    /** Quantos horários a geração em lote criou e quantos pulou (já ocupados na agenda ou já passados). */
     public record ResultadoLote(int gerados, int ignorados) {
     }
 
     /**
      * Gera os horários do médico no período: em cada dia da semana escolhido, um horário a
      * cada "duracaoMinutos", da hora inicial até a hora final (a última consulta termina, no
-     * máximo, na hora final). Horários que já existem ou que já passaram são pulados, então
-     * o mesmo lote pode ser gerado de novo sem erro. Tudo é gravado na mesma transação.
+     * máximo, na hora final). Horários que se sobrepõem a outro já cadastrado ou que já
+     * passaram são pulados, então o mesmo lote pode ser gerado de novo sem erro. Tudo é gravado na mesma transação.
      */
     @Transactional
     public ResultadoLote gerarEmLote(AgendaLoteForm form) {
         exigirMedico(form.getMedicoId());
         validarLote(form);
 
+        medicoService.bloquear(form.getMedicoId());
         Medico medico = medicoService.buscar(form.getMedicoId());
         LocalDateTime agora = LocalDateTime.now(clock);
 
-        Set<LocalDateTime> existentes = repository
+        Map<LocalDate, List<Agenda>> existentes = repository
                 .findByMedicoIdAndDataBetween(medico.getId(), form.getDataInicio(), form.getDataFim()).stream()
-                .map(Agenda::getDataHora)
-                .collect(Collectors.toSet());
+                .collect(Collectors.groupingBy(Agenda::getData));
 
         List<Agenda> novos = new ArrayList<>();
         int ignorados = 0;
         for (LocalDateTime dataHora : horariosDoLote(form)) {
-            if (!dataHora.isAfter(agora) || existentes.contains(dataHora))
+            Agenda novo = new Agenda(medico, dataHora.toLocalDate(), dataHora.toLocalTime(), form.getDuracaoMinutos());
+            if (!dataHora.isAfter(agora)
+                    || existentes.getOrDefault(novo.getData(), List.of()).stream().anyMatch(novo::sobrepoe))
                 ignorados++;
             else
-                novos.add(new Agenda(medico, dataHora.toLocalDate(), dataHora.toLocalTime()));
+                novos.add(novo);
         }
 
         if (novos.isEmpty())
             throw new RegraNegocioException(
-                    "Nenhum horário novo para gerar: os horários do período já estavam cadastrados ou já passaram.");
+                    "Nenhum horário novo para gerar: os horários do período já estavam ocupados na agenda ou já passaram.");
         if (novos.size() > MAXIMO_HORARIOS_LOTE)
             throw new RegraNegocioException("O lote geraria " + novos.size() + " horários; o máximo é "
                     + MAXIMO_HORARIOS_LOTE + ". Reduza o período ou aumente a duração das consultas.");
@@ -193,8 +206,7 @@ public class AgendaService {
             throw new RegraNegocioException("diasSemana", "Selecione ao menos um dia da semana.");
 
         Integer duracao = form.getDuracaoMinutos();
-        if (duracao == null || duracao < 10 || duracao > 240)
-            throw new RegraNegocioException("duracaoMinutos", "A duração deve ficar entre 10 e 240 minutos.");
+        exigirDuracao(duracao);
 
         if (form.getHoraInicio() == null)
             throw new RegraNegocioException("horaInicio", "Informe o horário inicial.");
@@ -220,6 +232,11 @@ public class AgendaService {
                 horarios.add(LocalDateTime.of(data, LocalTime.of(minuto / 60, minuto % 60)));
         }
         return horarios;
+    }
+
+    private static void exigirDuracao(Integer minutos) {
+        if (minutos == null || minutos < 10 || minutos > 240)
+            throw new RegraNegocioException("duracaoMinutos", DURACAO_INVALIDA);
     }
 
     private void exigirMedico(Long medicoId) {

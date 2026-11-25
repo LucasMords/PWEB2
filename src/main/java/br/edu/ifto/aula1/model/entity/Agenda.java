@@ -26,6 +26,8 @@ import java.time.LocalTime;
         name = "uk_agenda_medico_data_horario", columnNames = {"medico_id", "data", "horario"}))
 public class Agenda {
 
+    public static final int DURACAO_PADRAO_MINUTOS = 30;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -40,6 +42,9 @@ public class Agenda {
     @Column(nullable = false, updatable = false)
     private LocalTime horario;
 
+    @Column(name = "duracao_minutos", nullable = false, updatable = false)
+    private int duracaoMinutos;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private StatusAgenda status = StatusAgenda.DISPONIVEL;
@@ -47,11 +52,35 @@ public class Agenda {
     protected Agenda() {
     }
 
-    /** Todo horário nasce DISPONIVEL. */
+    /** Todo horário nasce DISPONIVEL. Sem duração informada, vale a padrão. */
     public Agenda(Medico medico, LocalDate data, LocalTime horario) {
+        this(medico, data, horario, DURACAO_PADRAO_MINUTOS);
+    }
+
+    public Agenda(Medico medico, LocalDate data, LocalTime horario, int duracaoMinutos) {
         this.medico = medico;
         this.data = data;
         this.horario = horario;
+        this.duracaoMinutos = duracaoMinutos;
+    }
+
+    /**
+     * Os dois horários ocupam algum minuto em comum? Um que começa exatamente quando o outro
+     * termina não se sobrepõe. Compara minutos do dia para não "virar" a meia-noite.
+     */
+    public boolean sobrepoe(Agenda outra) {
+        return data.equals(outra.getData())
+                && minutoInicial() < outra.minutoInicial() + outra.getDuracaoMinutos()
+                && outra.minutoInicial() < minutoInicial() + duracaoMinutos;
+    }
+
+    /** O atendimento termina no mesmo dia em que começa (até a meia-noite)? */
+    public boolean terminaNoMesmoDia() {
+        return minutoInicial() + duracaoMinutos <= 24 * 60;
+    }
+
+    private int minutoInicial() {
+        return getHorario().getHour() * 60 + getHorario().getMinute();
     }
 
     public boolean isDisponivel() {
@@ -86,6 +115,10 @@ public class Agenda {
 
     public LocalTime getHorario() {
         return horario;
+    }
+
+    public int getDuracaoMinutos() {
+        return duracaoMinutos;
     }
 
     public StatusAgenda getStatus() {

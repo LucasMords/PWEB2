@@ -32,16 +32,22 @@
                 </div>
 
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label class="form-label" for="data">Data</label>
                         <input type="date" class="form-control" th:field="*{data}" th:errorclass="is-invalid">
                         <div class="invalid-feedback" th:errors="*{data}"></div>
                     </div>
 
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label class="form-label" for="horario">Horário</label>
                         <input type="time" class="form-control" th:field="*{horario}" th:errorclass="is-invalid">
                         <div class="invalid-feedback" th:errors="*{horario}"></div>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label" for="duracaoMinutos">Duração (minutos)</label>
+                        <input type="number" class="form-control" th:field="*{duracaoMinutos}" th:errorclass="is-invalid">
+                        <div class="invalid-feedback" th:errors="*{duracaoMinutos}"></div>
                     </div>
                 </div>
 
